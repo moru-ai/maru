@@ -30,6 +30,8 @@ COPY --from=builder /app/out/full/ .
 RUN rm -rf packages/db/generated/ packages/db/dist/
 RUN npm run generate --filter=@repo/db
 RUN npx turbo build --filter=@repo/db
+RUN npx turbo build --filter=@repo/types
+RUN npx turbo build --filter=@repo/command-security
 
 # Build the server with inline commands (replicating build script logic)
 WORKDIR /app/apps/server
