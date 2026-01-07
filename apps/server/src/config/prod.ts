@@ -19,7 +19,7 @@ if (!process.env.VM_IMAGE_REGISTRY) {
 const prodConfigSchema = sharedConfigSchema.extend({
   // === CORS CONFIGURATION ===
   // Production CORS origins
-  CORS_ORIGINS: z.string().default("https://www.shadowrealm.ai"),
+  CORS_ORIGINS: z.string().default("https://maru.moru.io"),
 
   // === EXECUTION MODE ===
   // Controls how agent code executes - 'remote' for Kata VM, 'moru' for Moru Sandbox, 'local' for direct execution

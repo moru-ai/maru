@@ -94,8 +94,8 @@ export async function saveApiKey(provider: ApiKeyProvider, key: string | null) {
       sameSite: isProduction ? "none" : "lax",
       maxAge: 60 * 60 * 24 * 30,
       path: "/",
-      // Allow cookies to be sent to all shadowrealm.ai subdomains (www.shadowrealm.ai and api.shadowrealm.ai)
-      domain: isProduction ? ".shadowrealm.ai" : undefined,
+      // Allow cookies to be sent to all subdomains
+      domain: isProduction ? ".moru.io" : undefined,
     });
   } else {
     cookieStore.delete(cookieName);
@@ -152,7 +152,7 @@ export async function saveApiKeyValidation(
       sameSite: isProduction ? "none" : "lax",
       maxAge: 60 * 60 * 24 * 30, // 30 days
       path: "/",
-      domain: isProduction ? ".shadowrealm.ai" : undefined,
+      domain: isProduction ? ".moru.io" : undefined,
     });
   } else {
     cookieStore.delete(cookieName);
