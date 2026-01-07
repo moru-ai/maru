@@ -42,7 +42,7 @@ interface FsChangeEvent {
     | "directory-deleted";
   filePath: string;
   timestamp: number;
-  source: "local" | "remote";
+  source: "local" | "remote" | "moru";
   isDirectory: boolean;
 }
 
