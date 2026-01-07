@@ -168,6 +168,7 @@ model TaskSession {
   id           String    @id @default(cuid())
   podName      String?
   podNamespace String?
+  sandboxId    String?   @unique // Moru sandbox ID for reconnection
   isActive     Boolean   @default(true)
   connectionId String?
   createdAt    DateTime  @default(now())
@@ -176,6 +177,7 @@ model TaskSession {
   task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId, isActive])
+  @@index([sandboxId])
 }
 
 model CodebaseUnderstanding {
@@ -274,6 +276,10 @@ enum InitStatus {
   INSTALL_DEPENDENCIES
   COMPLETE_SHADOW_WIKI
   ACTIVE
+  // Moru sandbox mode steps
+  CREATE_SANDBOX
+  CLONE_REPOSITORY
+  SETUP_GIT
 }
 
 model UserSettings {

@@ -11,8 +11,8 @@ dotenv.config({ debug: false });
 const devConfigSchema = sharedConfigSchema.extend({
   // CORS origins for development
   CORS_ORIGINS: z.string().default("http://localhost:3000"),
-  // Development execution mode (defaults to local)
-  AGENT_MODE: z.enum(["local", "remote"]).default("local"),
+  // Development execution mode (defaults to local, 'moru' for Moru Sandbox)
+  AGENT_MODE: z.enum(["local", "remote", "moru"]).default("local"),
 
   // Local development workspace
   WORKSPACE_DIR: z.string().default("/workspace"),

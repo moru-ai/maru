@@ -17,6 +17,8 @@ import { RemoteGitService } from "./remote/remote-git-service";
 import { GitService } from "./interfaces/git-service";
 import { GitManager } from "../services/git-manager";
 import { prisma } from "@repo/db";
+import { moruWorkspaceManager } from "./moru/moru-workspace-manager";
+import { MoruGitService } from "./moru/moru-git-service";
 
 /**
  * Create a tool executor based on the configured agent mode
@@ -31,6 +33,11 @@ export async function createToolExecutor(
 
   if (agentMode === "local") {
     return new LocalToolExecutor(taskId, workspacePath);
+  }
+
+  if (agentMode === "moru") {
+    // For moru mode, use the singleton workspace manager to get executor
+    return moruWorkspaceManager.getExecutor(taskId);
   }
 
   // For remote mode, use dynamic pod discovery to find the actual running VM
@@ -86,6 +93,9 @@ export function createWorkspaceManager(mode?: AgentMode): WorkspaceManager {
     case "remote":
       return new RemoteWorkspaceManager();
 
+    case "moru":
+      return moruWorkspaceManager;
+
     default:
       throw new Error(`Unsupported agent mode: ${agentMode}`);
   }
@@ -109,6 +119,13 @@ export async function createGitService(taskId: string): Promise<GitService> {
     // For remote mode, use the tool executor to wrap git operations
     const toolExecutor = await createToolExecutor(taskId);
     return new RemoteGitService(toolExecutor as RemoteToolExecutor);
+  } else if (agentMode === "moru") {
+    // For moru mode, get sandbox from workspace manager and create MoruGitService
+    const sandbox = await moruWorkspaceManager.getSandbox(taskId);
+    if (!sandbox) {
+      throw new Error(`No sandbox found for task ${taskId}`);
+    }
+    return new MoruGitService(sandbox);
   } else {
     // For local mode, get workspace path and create GitManager
     const task = await prisma.task.findUnique({
@@ -143,7 +160,14 @@ export function isLocalMode(): boolean {
  * Check if the current mode requires VM infrastructure
  */
 export function isVMMode(): boolean {
-  return config.agentMode === "remote";
+  return config.agentMode === "remote" || config.agentMode === "moru";
+}
+
+/**
+ * Check if the current mode is moru
+ */
+export function isMoruMode(): boolean {
+  return config.agentMode === "moru";
 }
 
 // Re-export types and interfaces for convenience

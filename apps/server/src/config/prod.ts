@@ -22,8 +22,8 @@ const prodConfigSchema = sharedConfigSchema.extend({
   CORS_ORIGINS: z.string().default("https://www.shadowrealm.ai"),
 
   // === EXECUTION MODE ===
-  // Controls how agent code executes - 'remote' for VM isolation, 'local' for direct execution
-  AGENT_MODE: z.enum(["local", "remote"]).default("remote"),
+  // Controls how agent code executes - 'remote' for Kata VM, 'moru' for Moru Sandbox, 'local' for direct execution
+  AGENT_MODE: z.enum(["local", "remote", "moru"]).default("remote"),
 
   // === KATA QEMU VM CORE CONFIGURATION ===
   // Docker registry containing VM images with pre-installed tools (Node.js, Python, etc.)

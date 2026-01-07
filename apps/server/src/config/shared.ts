@@ -61,6 +61,11 @@ export const sharedConfigSchema = z.object({
   ENABLE_BRAINTRUST: z
     .union([z.boolean(), z.string().transform((val) => val === "true")])
     .default(false),
+
+  // Moru Sandbox configuration
+  MORU_API_KEY: z.string().optional(),
+  MORU_TEMPLATE_ID: z.string().default("shadow-agent"),
+  MORU_SANDBOX_TIMEOUT_MS: z.coerce.number().default(3600000), // 1 hour
 });
 
 /**
@@ -102,6 +107,11 @@ export const createSharedConfig = (
   braintrustApiKey: data.BRAINTRUST_API_KEY,
   braintrustProjectId: data.BRAINTRUST_PROJECT_ID,
   enableBraintrust: data.ENABLE_BRAINTRUST,
+
+  // Moru Sandbox
+  moruApiKey: data.MORU_API_KEY,
+  moruTemplateId: data.MORU_TEMPLATE_ID,
+  moruSandboxTimeoutMs: data.MORU_SANDBOX_TIMEOUT_MS,
 });
 
 export type SharedConfig = ReturnType<typeof createSharedConfig>;

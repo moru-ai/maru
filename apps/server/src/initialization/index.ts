@@ -3,12 +3,15 @@ import { getStepsForMode, InitializationProgress } from "@repo/types";
 import { emitStreamChunk } from "../socket";
 import { createWorkspaceManager, getAgentMode } from "../execution";
 import type { WorkspaceManager as AbstractWorkspaceManager } from "../execution";
+import { moruWorkspaceManager } from "../execution/moru/moru-workspace-manager";
+import { MoruGitService } from "../execution/moru/moru-git-service";
 import {
   setInitStatus,
   setTaskFailed,
   clearTaskProgress,
   setTaskInitialized,
 } from "../utils/task-status";
+import { getGitHubAccessToken } from "../github/auth/account-service";
 import { BackgroundServiceManager } from "./background-service-manager";
 import { TaskModelContext } from "../services/task-model-context";
 
@@ -145,6 +148,19 @@ export class TaskInitializationEngine {
 
       case "COMPLETE_SHADOW_WIKI":
         await this.executeCompleteShadowWiki(taskId);
+        break;
+
+      // Moru mode steps
+      case "CREATE_SANDBOX":
+        await this.executeCreateSandbox(taskId, userId);
+        break;
+
+      case "CLONE_REPOSITORY":
+        await this.executeCloneRepository(taskId, userId);
+        break;
+
+      case "SETUP_GIT":
+        await this.executeSetupGit(taskId, userId);
         break;
 
       case "INACTIVE":
@@ -535,6 +551,210 @@ export class TaskInitializationEngine {
         error
       );
       // Don't throw error - we want to continue to ACTIVE even if background services had issues
+    }
+  }
+
+  /**
+   * Create Moru Sandbox step - moru mode only
+   * Creates a new Moru sandbox VM for the task
+   */
+  private async executeCreateSandbox(
+    taskId: string,
+    userId: string
+  ): Promise<void> {
+    const agentMode = getAgentMode();
+    if (agentMode !== "moru") {
+      throw new Error(
+        `CREATE_SANDBOX step should only be used in moru mode, but agent mode is: ${agentMode}`
+      );
+    }
+
+    try {
+      // Get task info
+      const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: {
+          repoFullName: true,
+          repoUrl: true,
+          baseBranch: true,
+          shadowBranch: true,
+        },
+      });
+
+      if (!task) {
+        throw new Error(`Task not found: ${taskId}`);
+      }
+
+      console.log(`[TASK_INIT] ${taskId}: Creating Moru sandbox...`);
+
+      // Create sandbox via workspace manager
+      const workspaceInfo = await moruWorkspaceManager.prepareWorkspace({
+        id: taskId,
+        repoFullName: task.repoFullName,
+        repoUrl: task.repoUrl,
+        baseBranch: task.baseBranch || "main",
+        shadowBranch: task.shadowBranch || `shadow/task-${taskId}`,
+        userId,
+      });
+
+      if (!workspaceInfo.success) {
+        throw new Error(`Failed to create sandbox: ${workspaceInfo.error}`);
+      }
+
+      // Update task with workspace path
+      await prisma.task.update({
+        where: { id: taskId },
+        data: {
+          workspacePath: workspaceInfo.workspacePath,
+        },
+      });
+
+      console.log(`[TASK_INIT] ${taskId}: Moru sandbox created successfully`);
+    } catch (error) {
+      console.error(`[TASK_INIT] ${taskId}: Failed to create sandbox:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clone Repository step - moru mode only
+   * Clones the repository into the Moru sandbox
+   */
+  private async executeCloneRepository(
+    taskId: string,
+    userId: string
+  ): Promise<void> {
+    const agentMode = getAgentMode();
+    if (agentMode !== "moru") {
+      throw new Error(
+        `CLONE_REPOSITORY step should only be used in moru mode, but agent mode is: ${agentMode}`
+      );
+    }
+
+    try {
+      // Get task info
+      const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: {
+          repoUrl: true,
+          baseBranch: true,
+        },
+      });
+
+      if (!task) {
+        throw new Error(`Task not found: ${taskId}`);
+      }
+
+      // Get GitHub token for cloning
+      const githubToken = await getGitHubAccessToken(userId);
+
+      if (!githubToken) {
+        throw new Error("GitHub access token not found for user");
+      }
+
+      // Get sandbox and clone repository
+      const sandbox = await moruWorkspaceManager.getSandbox(taskId);
+      if (!sandbox) {
+        throw new Error(`No sandbox found for task ${taskId}`);
+      }
+
+      const gitService = new MoruGitService(sandbox);
+
+      console.log(`[TASK_INIT] ${taskId}: Cloning repository...`);
+
+      await gitService.cloneRepository(
+        task.repoUrl,
+        task.baseBranch || "main",
+        githubToken
+      );
+
+      console.log(`[TASK_INIT] ${taskId}: Repository cloned successfully`);
+    } catch (error) {
+      console.error(`[TASK_INIT] ${taskId}: Failed to clone repository:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Setup Git step - moru mode only
+   * Configures git user and creates shadow branch
+   */
+  private async executeSetupGit(
+    taskId: string,
+    userId: string
+  ): Promise<void> {
+    const agentMode = getAgentMode();
+    if (agentMode !== "moru") {
+      throw new Error(
+        `SETUP_GIT step should only be used in moru mode, but agent mode is: ${agentMode}`
+      );
+    }
+
+    try {
+      // Get task info
+      const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: {
+          baseBranch: true,
+          shadowBranch: true,
+        },
+      });
+
+      if (!task) {
+        throw new Error(`Task not found: ${taskId}`);
+      }
+
+      // Get user info for git config
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, email: true },
+      });
+
+      if (!user) {
+        throw new Error(`User not found: ${userId}`);
+      }
+
+      // Get sandbox
+      const sandbox = await moruWorkspaceManager.getSandbox(taskId);
+      if (!sandbox) {
+        throw new Error(`No sandbox found for task ${taskId}`);
+      }
+
+      const gitService = new MoruGitService(sandbox);
+
+      console.log(`[TASK_INIT] ${taskId}: Configuring git...`);
+
+      // Configure git user
+      await gitService.configureGitUser({
+        name: user.name || "Shadow Agent",
+        email: user.email || "shadow@example.com",
+      });
+
+      // Create shadow branch from base branch
+      const baseBranch = task.baseBranch || "main";
+      const shadowBranch = task.shadowBranch || `shadow/task-${taskId}`;
+
+      console.log(
+        `[TASK_INIT] ${taskId}: Creating shadow branch ${shadowBranch} from ${baseBranch}...`
+      );
+
+      const baseCommitSha = await gitService.createShadowBranch(
+        baseBranch,
+        shadowBranch
+      );
+
+      // Store base commit SHA in task
+      await prisma.task.update({
+        where: { id: taskId },
+        data: {
+          baseCommitSha,
+        },
+      });
+
+      console.log(`[TASK_INIT] ${taskId}: Git setup complete`);
+    } catch (error) {
+      console.error(`[TASK_INIT] ${taskId}: Failed to setup git:`, error);
+      throw error;
     }
   }
 

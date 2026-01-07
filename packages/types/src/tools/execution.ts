@@ -1,5 +1,5 @@
 // Execution mode type
-export type AgentMode = "local" | "remote";
+export type AgentMode = "local" | "remote" | "moru";
 
 // Tool operation options
 export interface ReadFileOptions {

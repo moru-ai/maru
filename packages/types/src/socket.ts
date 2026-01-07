@@ -4,7 +4,7 @@ export interface FileSystemEvent {
   type: 'file-created' | 'file-modified' | 'file-deleted' | 'directory-created' | 'directory-deleted';
   path: string;
   timestamp: number;
-  source: 'local' | 'remote';
+  source: 'local' | 'remote' | 'moru';
   isDirectory: boolean;
 }
 
