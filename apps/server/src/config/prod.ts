@@ -27,9 +27,8 @@ const prodConfigSchema = sharedConfigSchema.extend({
 
   // === KATA QEMU VM CORE CONFIGURATION ===
   // Docker registry containing VM images with pre-installed tools (Node.js, Python, etc.)
-  VM_IMAGE_REGISTRY: z
-    .string()
-    .min(1, "VM_IMAGE_REGISTRY is required in production"),
+  // Optional when using moru mode
+  VM_IMAGE_REGISTRY: z.string().optional(),
   // Image tag/version to pull (e.g., 'v1.2.3', 'latest')
   VM_IMAGE_TAG: z.string().default("latest"),
   // Number of vCPUs allocated per VM (1-16 cores)
@@ -45,9 +44,8 @@ const prodConfigSchema = sharedConfigSchema.extend({
   // Kubernetes API server port (auto-detected if not specified)
   KUBERNETES_SERVICE_PORT: z.string().optional(),
   // Service account token for pod creation and management
-  K8S_SERVICE_ACCOUNT_TOKEN: z
-    .string()
-    .min(1, "K8S_SERVICE_ACCOUNT_TOKEN is required in production"),
+  // Optional when using moru mode
+  K8S_SERVICE_ACCOUNT_TOKEN: z.string().optional(),
 
   // === KUBERNETES POD CONFIGURATION ===
   // Pod restart policy (Never = single-use pods, OnFailure = retry on crashes)
@@ -173,7 +171,8 @@ const prodConfigSchema = sharedConfigSchema.extend({
   WORKSPACE_DIR: z.string().default("/var/lib/shadow/workspaces"),
 
   // === API SECURITY ===
-  SHADOW_API_KEY: z.string().min(1, "SHADOW_API_KEY is required in production"),
+  // Optional - only needed for frontend-to-backend auth
+  SHADOW_API_KEY: z.string().optional(),
 });
 
 /**
