@@ -49,5 +49,8 @@ export * from "./api-keys";
 export * from "./mcp/utils";
 export * from "./mcp/types";
 
+// === Claude Code Session Types ===
+export * as ClaudeCode from "./claude-code";
+
 // === Task Limits ===
 export const MAX_TASKS_PER_USER_PRODUCTION = 5;

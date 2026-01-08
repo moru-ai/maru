@@ -1,6 +1,7 @@
 import { marked } from "marked";
 import { memo, useMemo, useEffect, useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { ShikiCode } from "@/components/ui/shiki-code";
 import { useStickToBottom } from "use-stick-to-bottom";
 
@@ -12,8 +13,9 @@ function parseMarkdownIntoBlocks(markdown: string): string[] {
 const MemoizedMarkdownBlock = memo(
   ({ content }: { content: string }) => {
     return (
-      <div className="prose text-foreground prose-headings:font-medium prose-h1:text-2xl prose-sm prose-invert prose-neutral prose-ul:list-disc prose-ol:list-decimal prose-li:marker:text-muted-foreground prose-code:rounded-sm prose-code:border prose-code:bg-card prose-code:px-1 prose-code:before:content-none prose-code:after:content-none prose-code:font-normal prose-pre:p-0 prose-pre:bg-background max-w-none">
+      <div className="prose text-foreground prose-headings:font-medium prose-h1:text-2xl prose-sm prose-invert prose-neutral prose-ul:list-disc prose-ol:list-decimal prose-li:marker:text-muted-foreground prose-code:rounded-sm prose-code:border prose-code:bg-card prose-code:px-1 prose-code:before:content-none prose-code:after:content-none prose-code:font-normal prose-pre:p-0 prose-pre:bg-background prose-table:border-collapse prose-th:border prose-th:border-border prose-th:px-4 prose-th:py-2 prose-th:bg-muted/50 prose-th:first:pl-4 prose-td:border prose-td:border-border prose-td:px-4 prose-td:py-2 prose-td:first:pl-4 max-w-none">
         <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
           components={{
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             code: ({ inline, children, className, ...props }: any) => {
