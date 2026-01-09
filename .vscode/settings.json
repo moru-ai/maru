@@ -30,5 +30,16 @@
   "[markdown]": {
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "vscode.markdown-language-features"
-  }
+  },
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "python.defaultInterpreterPath": "${workspaceFolder}/apps/agent/.venv/bin/python",
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.extraPaths": ["${workspaceFolder}/apps/agent/src"]
 }
