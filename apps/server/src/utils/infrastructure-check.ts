@@ -106,10 +106,11 @@ async function triggerReinitialization(
   // Use TaskInitializationEngine with re-init optimized steps
   const initEngine = new TaskInitializationEngine();
 
-  // Get all remote mode steps and filter out steps not critical for resumption
-  const allRemoteSteps = getStepsForMode("remote");
+  // Get steps for current agent mode and filter out steps not critical for resumption
+  const agentMode = getAgentMode();
+  const allSteps = getStepsForMode(agentMode);
   const stepsToSkip = ["START_BACKGROUND_SERVICES", "COMPLETE_SHADOW_WIKI"];
-  const reinitSteps = allRemoteSteps.filter(step => !stepsToSkip.includes(step));
+  const reinitSteps = allSteps.filter(step => !stepsToSkip.includes(step));
 
   await initEngine.initializeTask(taskId, [...reinitSteps], userId, context);
 

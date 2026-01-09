@@ -6,8 +6,8 @@ import {
   getApiKeyValidation,
   saveApiKeyValidation,
   clearApiKeyValidation,
-  type ApiKeyProvider,
 } from "@/lib/actions/api-keys";
+import type { ApiKeyProvider } from "@repo/types";
 
 export function useApiKeys() {
   return useQuery({

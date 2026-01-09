@@ -8,6 +8,7 @@ export { CCAssistantMessage } from "./cc-assistant-message";
 export { CCThinkingBlock } from "./cc-thinking-block";
 export { CCToolUseBlock } from "./cc-tool-use-block";
 export { CCMessages } from "./cc-messages";
+export { CCTodoPanel, extractTodosFromEntries } from "./cc-todo-panel";
 
 // Re-export types
 export * from "./types";

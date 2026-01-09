@@ -19,6 +19,7 @@ const base = (parentUuid: string | null = null) => ({
   timestamp: new Date().toISOString(),
   version: "2.1.1" as const,
   cwd: "/Users/demo/project",
+  gitBranch: "main",
   isSidechain: false,
   userType: "external" as const,
 });
@@ -31,6 +32,7 @@ const baseWithId = (id: string, parentUuid: string | null = null) => ({
   timestamp: new Date().toISOString(),
   version: "2.1.1" as const,
   cwd: "/Users/demo/project",
+  gitBranch: "main",
   isSidechain: false,
   userType: "external" as const,
 });
@@ -147,6 +149,8 @@ export const MOCK_CASES: Record<string, { name: string; description: string; ent
             },
           ],
         },
+        toolUseResult: '{"name":"my-project","version":"1.0.0",...}',
+        sourceToolAssistantUUID: "assistant-read-001",
       },
     ] as SessionEntry[],
   },
@@ -192,6 +196,8 @@ export const MOCK_CASES: Record<string, { name: string; description: string; ent
             },
           ],
         },
+        toolUseResult: "Tests passed: 2/2",
+        sourceToolAssistantUUID: "assistant-bash-success-001",
       },
     ] as SessionEntry[],
   },
@@ -237,6 +243,8 @@ export const MOCK_CASES: Record<string, { name: string; description: string; ent
             },
           ],
         },
+        toolUseResult: "Error: Permission denied",
+        sourceToolAssistantUUID: "assistant-bash-error-001",
       },
     ] as SessionEntry[],
   },
@@ -528,16 +536,18 @@ export const MOCK_CASES: Record<string, { name: string; description: string; ent
     ] as SessionEntry[],
   },
 
-  // 12. TodoWrite
+  // 12. TodoWrite - Shows progression sequence like real sessions
   "tool-todo": {
     name: "Todo List",
-    description: "TodoWrite tool with task tracking",
+    description: "TodoWrite tool with task tracking (multi-step progression)",
     entries: [
+      // User request
       {
         type: "user",
         ...base(),
         message: { role: "user", content: "Help me implement user authentication" },
       },
+      // First TodoWrite: Create initial task list
       {
         type: "assistant",
         ...baseWithId("assistant-todo-001"),
@@ -574,14 +584,91 @@ export const MOCK_CASES: Record<string, { name: string; description: string; ent
         ...base("assistant-todo-001"),
         message: {
           role: "user",
+          content: [{ type: "tool_result", tool_use_id: "toolu_todo_001", content: "Todo list updated" }],
+        },
+        toolUseResult: { oldTodos: [], newTodos: "..." },
+      },
+      // Second TodoWrite: First task completed, second in progress
+      {
+        type: "assistant",
+        ...baseWithId("assistant-todo-002"),
+        requestId: "req_002",
+        message: {
+          model: "claude-opus-4-5-20251101",
+          id: "msg_002",
+          type: "message",
+          role: "assistant",
           content: [
+            { type: "text", text: "Auth context created. Now implementing the login form." },
             {
-              type: "tool_result",
-              tool_use_id: "toolu_todo_001",
-              content: "Todo list updated",
+              type: "tool_use",
+              id: "toolu_todo_002",
+              name: "TodoWrite",
+              input: {
+                todos: [
+                  { content: "Create auth context and provider", status: "completed", activeForm: "Creating auth context" },
+                  { content: "Implement login form component", status: "in_progress", activeForm: "Implementing login form" },
+                  { content: "Add JWT token handling", status: "pending", activeForm: "Adding JWT handling" },
+                  { content: "Create protected route wrapper", status: "pending", activeForm: "Creating protected routes" },
+                  { content: "Add logout functionality", status: "pending", activeForm: "Adding logout" },
+                ],
+              },
             },
           ],
+          stop_reason: "tool_use",
+          stop_sequence: null,
+          usage: { input_tokens: 150, output_tokens: 90 },
         },
+      },
+      {
+        type: "user",
+        ...base("assistant-todo-002"),
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "toolu_todo_002", content: "Todo list updated" }],
+        },
+        toolUseResult: { oldTodos: "...", newTodos: "..." },
+      },
+      // Third TodoWrite: Two completed, third in progress
+      {
+        type: "assistant",
+        ...baseWithId("assistant-todo-003"),
+        requestId: "req_003",
+        message: {
+          model: "claude-opus-4-5-20251101",
+          id: "msg_003",
+          type: "message",
+          role: "assistant",
+          content: [
+            { type: "text", text: "Login form complete. Adding JWT token handling now." },
+            {
+              type: "tool_use",
+              id: "toolu_todo_003",
+              name: "TodoWrite",
+              input: {
+                todos: [
+                  { content: "Create auth context and provider", status: "completed", activeForm: "Creating auth context" },
+                  { content: "Implement login form component", status: "completed", activeForm: "Implementing login form" },
+                  { content: "Add JWT token handling", status: "in_progress", activeForm: "Adding JWT handling" },
+                  { content: "Create protected route wrapper", status: "pending", activeForm: "Creating protected routes" },
+                  { content: "Add logout functionality", status: "pending", activeForm: "Adding logout" },
+                ],
+              },
+            },
+          ],
+          stop_reason: "tool_use",
+          stop_sequence: null,
+          usage: { input_tokens: 200, output_tokens: 100 },
+        },
+      },
+      {
+        type: "user",
+        ...base("assistant-todo-003"),
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "toolu_todo_003", content: "Todo list updated" }],
+        },
+        toolUseResult: { oldTodos: "...", newTodos: "..." },
       },
     ] as SessionEntry[],
   },

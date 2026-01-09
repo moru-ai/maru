@@ -55,6 +55,10 @@ function groupContentBlocks(
       if (isThinkingBlock(block)) {
         groups.push({ type: "thinking", block });
       } else if (isToolUseBlock(block)) {
+        // Skip TodoWrite - it's shown in the sticky todo panel
+        if (block.name === "TodoWrite") {
+          continue;
+        }
         const result = toolResults?.get(block.id);
         groups.push({ type: "tool-use", block, result });
       }

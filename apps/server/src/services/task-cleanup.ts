@@ -1,5 +1,5 @@
 import { prisma } from "@repo/db";
-import { createWorkspaceManager, getAgentMode } from "../execution";
+import { createWorkspaceManager, isVMMode } from "../execution";
 import { MemoryCleanupService } from "./memory-cleanup";
 
 export class TaskCleanupService {
@@ -8,13 +8,11 @@ export class TaskCleanupService {
 
   /**
    * Start the background cleanup service
-   * Only runs in remote mode
+   * Only runs in VM modes (remote and moru)
    */
   start(): void {
-    const agentMode = getAgentMode();
-
-    // Only run cleanup in remote mode
-    if (agentMode !== "remote") {
+    // Only run cleanup in VM modes (remote and moru)
+    if (!isVMMode()) {
       return;
     }
 

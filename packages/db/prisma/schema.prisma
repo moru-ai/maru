@@ -111,6 +111,7 @@ model Task {
 
   codebaseUnderstandingId String?
   codebaseUnderstanding   CodebaseUnderstanding? @relation(fields: [codebaseUnderstandingId], references: [id])
+  sessionEvents           SessionEvent[]
 }
 
 model RepositoryIndex {
@@ -296,6 +297,21 @@ model UserSettings {
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_settings")
+}
+
+model SessionEvent {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  timestamp DateTime
+  data      Json
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, timestamp])
+  @@index([userId])
+  @@map("session_event")
 }
 
 enum MemoryCategory {

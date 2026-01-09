@@ -16,8 +16,6 @@ import { ValidationResult } from "@/lib/types/validation";
 import { auth } from "@/lib/auth/auth";
 import { getUserSettings } from "@/lib/db-operations/user-settings";
 
-export type { ApiKeyProvider };
-
 export async function getApiKeys(): Promise<ApiKeys> {
   const cookieStore = await cookies();
   const openaiKey = cookieStore.get("openai-key")?.value;

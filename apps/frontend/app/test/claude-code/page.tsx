@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { CCMessages, SessionEntry } from "@/components/claude-code";
+import { useState, useEffect, useMemo } from "react";
+import { CCMessages, CCTodoPanel, extractTodosFromEntries, SessionEntry } from "@/components/claude-code";
 import {
   Select,
   SelectContent,
@@ -26,6 +26,9 @@ export default function ClaudeCodeTestPage() {
       setEntries([]);
     }
   }, [selectedCase]);
+
+  // Extract todos from entries
+  const todos = useMemo(() => extractTodosFromEntries(entries), [entries]);
 
   // Get current case info for display
   const currentMockCase = selectedCase ? MOCK_CASES[selectedCase] : null;
@@ -94,6 +97,9 @@ export default function ClaudeCodeTestPage() {
           </div>
         )}
       </div>
+
+      {/* Todo Panel - sticky at bottom */}
+      <CCTodoPanel todos={todos} />
 
       {/* Debug: Show raw entries */}
       {entries.length > 0 && (
