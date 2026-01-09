@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "shadow-agent-sandbox"
+name = "maru-agent"
 version = "0.1.0"
-description = "Sandbox template for Shadow coding agent with git and Node.js"
+description = "Shadow coding agent using Claude Agent SDK"
 authors = ["Moru <team@moru.io>"]
 package-mode = false
 
@@ -9,6 +9,13 @@ package-mode = false
 python = "^3.11"
 moru = "^0.1.0"
 python-dotenv = "^1.0.0"
+claude-agent-sdk = "^0.1.0"
+
+[tool.poetry.group.dev.dependencies]
+datamodel-code-generator = "^0.28.0"
+
+[tool.poetry.scripts]
+generate-protocol = "scripts.generate_protocol:main"
 
 [build-system]
 requires = ["poetry-core"]

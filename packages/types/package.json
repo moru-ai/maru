@@ -14,7 +14,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "lint": "eslint 'src/**/*.ts'",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "generate:agent-protocol": "json2ts schemas/agent-protocol/server-to-agent.json src/agent-protocol/server-to-agent.ts && json2ts schemas/agent-protocol/agent-to-server.json src/agent-protocol/agent-to-server.ts"
   },
   "dependencies": {
     "@repo/command-security": "*",
@@ -26,6 +27,7 @@
     "@repo/eslint-config": "^0.0.0",
     "@repo/typescript-config": "*",
     "eslint": "^9.31.0",
+    "json-schema-to-typescript": "^15.0.4",
     "prettier": "^3.6.2",
     "prettier-plugin-organize-imports": "^4.1.0",
     "typescript": "5.5.4"

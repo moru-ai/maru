@@ -2,6 +2,7 @@ import { TaskStatus, InitStatus, PullRequestSnapshot } from "@repo/db";
 import type { Message } from "../chat/messages";
 import type { StreamChunk } from "../chat/streaming-client";
 import type { ModelType } from "../llm/models";
+import type { SessionEntry } from "../claude-code/session";
 
 export type QueuedActionUI = {
   type: "message" | "stacked-pr";
@@ -90,6 +91,10 @@ export interface ServerToClientEvents {
     title?: string;
     newTaskId?: string;
   }) => void;
+
+  // Session events (Claude Code JSONL format)
+  "session-entry": (data: { taskId: string; entry: SessionEntry }) => void;
+  "session-entries": (data: { taskId: string; entries: SessionEntry[] }) => void;
 }
 
 export interface ClientToServerEvents {

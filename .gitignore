@@ -29,8 +29,10 @@ npm-debug.log*
 # Prompt research stuff (Ishaan)
 prompts-research/
 
-# Python virtual environments
+# Python
 .venv/
+__pycache__/
+*.pyc
 
 test-workspace/
 shadow-worktree/*

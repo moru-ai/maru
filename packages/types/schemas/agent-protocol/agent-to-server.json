@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-to-server",
+  "title": "AgentToServerMessage",
+  "description": "Messages sent from agent to server via stdout",
+  "oneOf": [
+    { "$ref": "#/$defs/ProcessReadyEvent" },
+    { "$ref": "#/$defs/ProcessErrorEvent" },
+    { "$ref": "#/$defs/ProcessStoppedEvent" },
+    { "$ref": "#/$defs/SessionStartedEvent" },
+    { "$ref": "#/$defs/SessionCompleteEvent" },
+    { "$ref": "#/$defs/SessionInterruptedEvent" },
+    { "$ref": "#/$defs/SessionErrorEvent" }
+  ],
+  "$defs": {
+    "ProcessReadyEvent": {
+      "type": "object",
+      "description": "Agent process started and session is ready",
+      "properties": {
+        "type": { "const": "process_ready" },
+        "workspace": { "type": "string" },
+        "session_id": { "type": "string" },
+        "resumed": { "type": "boolean" },
+        "forked": { "type": "boolean" }
+      },
+      "required": ["type", "workspace", "session_id"],
+      "additionalProperties": false
+    },
+    "ProcessErrorEvent": {
+      "type": "object",
+      "description": "Fatal error, process is stopping",
+      "properties": {
+        "type": { "const": "process_error" },
+        "message": { "type": "string" },
+        "code": { "type": "string" }
+      },
+      "required": ["type", "message"],
+      "additionalProperties": false
+    },
+    "SessionStartedEvent": {
+      "type": "object",
+      "description": "Message received, processing started",
+      "properties": {
+        "type": { "const": "session_started" },
+        "session_id": { "type": "string" }
+      },
+      "required": ["type", "session_id"],
+      "additionalProperties": false
+    },
+    "ResultData": {
+      "type": "object",
+      "properties": {
+        "duration_ms": { "type": "number" },
+        "duration_api_ms": { "type": "number" },
+        "total_cost_usd": { "type": ["number", "null"] },
+        "num_turns": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "SessionCompleteEvent": {
+      "type": "object",
+      "description": "Claude finished responding to the message",
+      "properties": {
+        "type": { "const": "session_complete" },
+        "session_id": { "type": "string" },
+        "result": { "$ref": "#/$defs/ResultData" }
+      },
+      "required": ["type", "session_id"],
+      "additionalProperties": false
+    },
+    "SessionInterruptedEvent": {
+      "type": "object",
+      "description": "Message processing was interrupted",
+      "properties": {
+        "type": { "const": "session_interrupted" },
+        "session_id": { "type": "string" }
+      },
+      "required": ["type", "session_id"],
+      "additionalProperties": false
+    },
+    "SessionErrorEvent": {
+      "type": "object",
+      "description": "Error during message processing",
+      "properties": {
+        "type": { "const": "session_error" },
+        "id": { "type": ["string", "null"] },
+        "message": { "type": "string" },
+        "code": { "type": "string" }
+      },
+      "required": ["type", "message"],
+      "additionalProperties": false
+    },
+    "ProcessStoppedEvent": {
+      "type": "object",
+      "description": "Agent process is stopping",
+      "properties": {
+        "type": { "const": "process_stopped" },
+        "reason": { "enum": ["stop", "error", "eof"] }
+      },
+      "required": ["type", "reason"],
+      "additionalProperties": false
+    }
+  }
+}

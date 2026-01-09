@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "server-to-agent",
+  "title": "ServerToAgentMessage",
+  "description": "Messages sent from server to agent via stdin",
+  "oneOf": [
+    { "$ref": "#/$defs/ProcessStartCommand" },
+    { "$ref": "#/$defs/SessionMessageCommand" },
+    { "$ref": "#/$defs/SessionInterruptCommand" },
+    { "$ref": "#/$defs/ProcessStopCommand" }
+  ],
+  "$defs": {
+    "ProcessStartCommand": {
+      "type": "object",
+      "description": "Start the agent process and create/resume a session",
+      "properties": {
+        "type": { "const": "process_start" },
+        "session_id": {
+          "type": "string",
+          "description": "Session ID to resume, omit for new session"
+        },
+        "fork": {
+          "type": "boolean",
+          "description": "Fork the session instead of continuing it"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "TextContent": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "text" },
+        "text": { "type": "string" }
+      },
+      "required": ["type", "text"],
+      "additionalProperties": false
+    },
+    "ImageSource": {
+      "type": "object",
+      "properties": {
+        "type": { "enum": ["base64", "url"] },
+        "media_type": { "type": "string" },
+        "data": { "type": "string" }
+      },
+      "required": ["type", "media_type", "data"],
+      "additionalProperties": false
+    },
+    "ImageContent": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "image" },
+        "source": { "$ref": "#/$defs/ImageSource" }
+      },
+      "required": ["type", "source"],
+      "additionalProperties": false
+    },
+    "ContentBlock": {
+      "oneOf": [
+        { "$ref": "#/$defs/TextContent" },
+        { "$ref": "#/$defs/ImageContent" }
+      ]
+    },
+    "SessionMessageCommand": {
+      "type": "object",
+      "description": "Send a message to Claude",
+      "properties": {
+        "type": { "const": "session_message" },
+        "text": { "type": "string" },
+        "content": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ContentBlock" }
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "SessionInterruptCommand": {
+      "type": "object",
+      "description": "Interrupt the current message processing",
+      "properties": {
+        "type": { "const": "session_interrupt" }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "ProcessStopCommand": {
+      "type": "object",
+      "description": "Stop the agent process",
+      "properties": {
+        "type": { "const": "process_stop" }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    }
+  }
+}
