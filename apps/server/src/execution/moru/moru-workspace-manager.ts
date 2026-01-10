@@ -15,7 +15,6 @@ import {
   stopMoruFilesystemWatcher,
 } from "../../services/moru-filesystem-watcher";
 import {
-  startMoruSessionWatcher,
   stopMoruSessionWatcher,
 } from "../../services/moru-session-watcher";
 
@@ -73,19 +72,8 @@ export class MoruWorkspaceManager implements WorkspaceManager {
         console.warn(`[MORU_WORKSPACE] Failed to start filesystem watcher:`, watchError);
       }
 
-      // Start session watcher for Claude Agent SDK JSONL events
-      try {
-        await startMoruSessionWatcher(
-          taskConfig.id,
-          taskConfig.userId,
-          sandbox,
-          this.workspacePath
-        );
-        console.log(`[MORU_WORKSPACE] Session watcher started for task ${taskConfig.id}`);
-      } catch (sessionWatchError) {
-        // Don't fail workspace creation if session watcher fails - just log warning
-        console.warn(`[MORU_WORKSPACE] Failed to start session watcher:`, sessionWatchError);
-      }
+      // Note: Session watcher is started by AgentProcessManager when session_started is received
+      // This ensures the ~/.claude/projects directory exists (created by Claude Agent SDK)
 
       return {
         success: true,
@@ -303,17 +291,6 @@ export class MoruWorkspaceManager implements WorkspaceManager {
    * Restart watchers after reconnecting to a sandbox
    */
   private async restartWatchers(taskId: string, sandbox: Sandbox): Promise<void> {
-    // Get userId from task
-    const task = await prisma.task.findUnique({
-      where: { id: taskId },
-      select: { userId: true },
-    });
-
-    if (!task) {
-      console.warn(`[MORU_WORKSPACE] Task ${taskId} not found, skipping watcher restart`);
-      return;
-    }
-
     // Restart filesystem watcher
     try {
       await startMoruFilesystemWatcher(taskId, sandbox);
@@ -322,13 +299,8 @@ export class MoruWorkspaceManager implements WorkspaceManager {
       console.warn(`[MORU_WORKSPACE] Failed to restart filesystem watcher:`, watchError);
     }
 
-    // Restart session watcher
-    try {
-      await startMoruSessionWatcher(taskId, task.userId, sandbox, this.workspacePath);
-      console.log(`[MORU_WORKSPACE] Session watcher restarted for task ${taskId}`);
-    } catch (sessionWatchError) {
-      console.warn(`[MORU_WORKSPACE] Failed to restart session watcher:`, sessionWatchError);
-    }
+    // Note: Session watcher is managed by AgentProcessManager (started on session_started event)
+    // It doesn't need to be restarted here since it's tied to agent lifecycle
   }
 
   /**

@@ -15,6 +15,7 @@ import { updateTaskStatus } from "./utils/task-status";
 import { parseApiKeysFromCookies } from "./utils/cookie-parser";
 import { modelContextService } from "./services/model-context-service";
 import { ensureTaskInfrastructureExists } from "./utils/infrastructure-check";
+import { agentProcessManager } from "./services/agent-process-manager";
 
 interface ConnectionState {
   lastSeen: number;
@@ -232,6 +233,17 @@ export function createSocketServer(
           return;
         }
 
+        // Get API key from connection state
+        const state = connectionStates.get(connectionId);
+        const anthropicApiKey = state?.apiKeys?.anthropic;
+
+        if (!anthropicApiKey) {
+          socket.emit("message-error", {
+            error: "Anthropic API key required. Please configure your API key in settings.",
+          });
+          return;
+        }
+
         // Get task workspace path and user info from database
         const task = await prisma.task.findUnique({
           where: { id: data.taskId },
@@ -243,40 +255,27 @@ export function createSocketServer(
           return;
         }
 
-        // Create model context for this task
-        const modelContext = await modelContextService.createContext(
-          data.taskId,
-          socket.handshake.headers.cookie,
-          data.llmModel as ModelType
-        );
-
-        await ensureTaskInfrastructureExists(data.taskId, task.userId);
+        // Ensure infrastructure exists (creates sandbox if needed)
+        await ensureTaskInfrastructureExists(data.taskId, task.userId, anthropicApiKey);
 
         await updateTaskStatus(data.taskId, "RUNNING", "SOCKET");
         startTerminalPolling(data.taskId);
 
-        // Validate that user has the required API key for the selected model
-        if (!modelContext.validateAccess()) {
-          const provider = modelContext.getProvider();
-          const providerName =
-            provider === "anthropic"
-              ? "Anthropic"
-              : provider === "openrouter"
-                ? "OpenRouter"
-                : "OpenAI";
-          socket.emit("message-error", {
-            error: `${providerName} API key required. Please configure your API key in settings to use ${data.llmModel}.`,
-          });
-          return;
+        // Start agent if not already running
+        if (!agentProcessManager.isRunning(data.taskId)) {
+          console.log(`[SOCKET] Starting agent for task ${data.taskId}`);
+          const { moruWorkspaceManager } = await import("./execution/moru/moru-workspace-manager.js");
+          const sandbox = await moruWorkspaceManager.getSandbox(data.taskId);
+          if (!sandbox) {
+            socket.emit("message-error", { error: "Sandbox not found for task" });
+            return;
+          }
+          await agentProcessManager.startAgent(data.taskId, sandbox, anthropicApiKey);
         }
 
-        await chatService.processUserMessage({
-          taskId: data.taskId,
-          userMessage: data.message,
-          context: modelContext,
-          workspacePath: task?.workspacePath || undefined,
-          queue: data.queue || false,
-        });
+        // Send message to agent via AgentProcessManager
+        await agentProcessManager.sendMessage(data.taskId, data.message);
+
       } catch (error) {
         console.error("Error processing user message:", error);
         socket.emit("message-error", { error: "Failed to process message" });
@@ -388,6 +387,40 @@ export function createSocketServer(
             ? null
             : chatService.getQueuedAction(data.taskId),
         });
+
+        // If this is a new task (complete: false) with an initial message,
+        // start the agent and send the initial message
+        if (!data.complete && history.length > 0) {
+          const lastMessage = history[history.length - 1]!;
+          // Check if the last message is from the user and hasn't been processed
+          if (lastMessage?.role === "user") {
+            const state = connectionStates.get(connectionId);
+            const anthropicApiKey = state?.apiKeys?.anthropic;
+
+            if (anthropicApiKey) {
+              console.log(`[SOCKET] Processing initial message for task ${data.taskId}`);
+
+              // Start agent if not running
+              if (!agentProcessManager.isRunning(data.taskId)) {
+                console.log(`[SOCKET] Starting agent for task ${data.taskId}`);
+                const { moruWorkspaceManager } = await import("./execution/moru/moru-workspace-manager.js");
+                const sandbox = await moruWorkspaceManager.getSandbox(data.taskId);
+                if (sandbox) {
+                  await agentProcessManager.startAgent(data.taskId, sandbox, anthropicApiKey);
+                  // Send the initial message to the agent
+                  const messageContent = typeof lastMessage.content === "string"
+                    ? lastMessage.content
+                    : JSON.stringify(lastMessage.content);
+                  await agentProcessManager.sendMessage(data.taskId, messageContent);
+                } else {
+                  console.warn(`[SOCKET] Sandbox not found for task ${data.taskId}`);
+                }
+              }
+            } else {
+              console.log(`[SOCKET] No API key available, waiting for user to send message`);
+            }
+          }
+        }
       } catch (error) {
         console.error(
           `[SOCKET] Error getting chat history for task ${data.taskId}:`,
@@ -409,7 +442,10 @@ export function createSocketServer(
           return;
         }
 
-        await chatService.stopStream(data.taskId, true);
+        // Interrupt the agent if running
+        if (agentProcessManager.isRunning(data.taskId)) {
+          await agentProcessManager.interrupt(data.taskId);
+        }
 
         endStream(data.taskId);
 

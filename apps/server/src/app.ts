@@ -103,7 +103,7 @@ app.post("/api/tasks/:taskId/initiate", async (req, res) => {
       });
     }
 
-    const { message, model, userId } = validation.data;
+    const { message: _message, model, userId } = validation.data;
 
     // Check task limit before processing (production only)
     const isAtLimit = await hasReachedTaskLimit(userId);
@@ -157,21 +157,11 @@ app.post("/api/tasks/:taskId/initiate", async (req, res) => {
       const initSteps = await initializationEngine.getDefaultStepsForTask();
       await initializationEngine.initializeTask(taskId, initSteps, userId);
 
-      const updatedTask = await prisma.task.findUnique({
-        where: { id: taskId },
-        select: { workspacePath: true },
-      });
-
       await updateTaskStatus(taskId, "RUNNING", "INIT");
 
-      await chatService.processUserMessage({
-        taskId,
-        userMessage: message,
-        context: initContext,
-        enableTools: true,
-        skipUserMessageSave: true,
-        workspacePath: updatedTask?.workspacePath || undefined,
-      });
+      // NOTE: We no longer call chatService.processUserMessage() here.
+      // The new agent flow is triggered via socket when user sends a message.
+      // The agent will be started on-demand in the socket handler.
 
       res.json({
         success: true,

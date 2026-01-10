@@ -18,10 +18,9 @@ type SessionEntry = ClaudeCode.SessionEntry;
  *
  * Path encoding: /workspace → -workspace
  *
- * Note: In our sandbox (Ubuntu + root user), ~ expands to /root
+ * Note: In our sandbox, Claude runs as 'user' so ~ expands to /home/user
  */
-
-const CLAUDE_PROJECTS_DIR = "/root/.claude/projects";
+const CLAUDE_PROJECTS_DIR = "/home/user/.claude/projects";
 
 /**
  * Encode a path for Claude's projects directory naming
@@ -90,53 +89,75 @@ export class MoruSessionWatcher {
       return;
     }
 
-    try {
-      // First, ensure the projects directory exists
-      const dirExists = await sandbox.files.exists(CLAUDE_PROJECTS_DIR);
-      if (!dirExists) {
-        console.log(
-          `[SESSION_WATCHER] Claude projects directory doesn't exist yet, will wait for it: ${CLAUDE_PROJECTS_DIR}`
-        );
-        // We'll start watching the parent directory and wait for the directory to be created
-      }
+    // Retry logic: wait for the projects directory to be created by Claude SDK
+    const maxRetries = 10;
+    const retryDelayMs = 500;
 
-      console.log(
-        `[SESSION_WATCHER] Starting session watch for task ${this.taskId} at ${this.projectDir}`
-      );
-
-      // Watch the projects directory recursively
-      this.watchHandle = await sandbox.files.watchDir(
-        CLAUDE_PROJECTS_DIR,
-        (event: FilesystemEvent) => {
-          this.handleFileEvent(event, sandbox);
-        },
-        {
-          recursive: true,
-          timeoutMs: 0, // No timeout - watch indefinitely
-          onExit: (err?: Error) => {
-            if (err) {
-              console.error(
-                `[SESSION_WATCHER] Watch stopped with error for task ${this.taskId}:`,
-                err
-              );
-            } else {
-              console.log(
-                `[SESSION_WATCHER] Watch stopped for task ${this.taskId}`
-              );
-            }
-          },
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Check if projects directory exists
+        const dirExists = await sandbox.files.exists(CLAUDE_PROJECTS_DIR);
+        if (!dirExists) {
+          if (attempt < maxRetries) {
+            console.log(
+              `[SESSION_WATCHER] Claude projects directory doesn't exist yet, waiting... (attempt ${attempt}/${maxRetries})`
+            );
+            await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+            continue;
+          } else {
+            console.warn(
+              `[SESSION_WATCHER] Claude projects directory not created after ${maxRetries} attempts for task ${this.taskId}`
+            );
+            return;
+          }
         }
-      );
 
-      console.log(
-        `[SESSION_WATCHER] Successfully started watching for task ${this.taskId}`
-      );
-    } catch (error) {
-      console.error(
-        `[SESSION_WATCHER] Failed to start watching for task ${this.taskId}:`,
-        error
-      );
-      throw error;
+        console.log(
+          `[SESSION_WATCHER] Starting session watch for task ${this.taskId} at ${this.projectDir}`
+        );
+
+        // Watch the projects directory recursively
+        this.watchHandle = await sandbox.files.watchDir(
+          CLAUDE_PROJECTS_DIR,
+          (event: FilesystemEvent) => {
+            this.handleFileEvent(event, sandbox);
+          },
+          {
+            recursive: true,
+            timeoutMs: 0, // No timeout - watch indefinitely
+            onExit: (err?: Error) => {
+              if (err) {
+                console.error(
+                  `[SESSION_WATCHER] Watch stopped with error for task ${this.taskId}:`,
+                  err
+                );
+              } else {
+                console.log(
+                  `[SESSION_WATCHER] Watch stopped for task ${this.taskId}`
+                );
+              }
+            },
+          }
+        );
+
+        console.log(
+          `[SESSION_WATCHER] Successfully started watching for task ${this.taskId}`
+        );
+        return;
+      } catch (error) {
+        if (attempt < maxRetries) {
+          console.log(
+            `[SESSION_WATCHER] Failed to start watching (attempt ${attempt}/${maxRetries}), retrying...`
+          );
+          await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+        } else {
+          console.error(
+            `[SESSION_WATCHER] Failed to start watching for task ${this.taskId} after ${maxRetries} attempts:`,
+            error
+          );
+          throw error;
+        }
+      }
     }
   }
 
