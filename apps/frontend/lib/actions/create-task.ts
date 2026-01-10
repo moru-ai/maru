@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth/auth";
-import { MessageRole, prisma, Task } from "@repo/db";
+import { prisma, Task } from "@repo/db";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { z, ZodIssue } from "zod";
@@ -77,23 +77,16 @@ export async function createTask(formData: FormData) {
     // Generate a simple title for the task
     const title = generateSimpleTitle(message);
 
-    // Create the task
+    // Create the task with initial message stored for /initiate to process
     task = await prisma.task.create({
       data: {
         id: taskId,
         title,
         status: "INITIALIZING",
+        initialMessage: message,  // Stored here, processed by /initiate
         user: {
           connect: {
             id: session.user.id,
-          },
-        },
-        messages: {
-          create: {
-            content: message,
-            role: MessageRole.USER,
-            sequence: 1,
-            llmModel: model,
           },
         },
       },

@@ -1,9 +1,33 @@
-import type { Message, ModelType } from "@repo/types";
+import type { ModelType, SessionEntry, ClaudeCode } from "@repo/types";
 import {
   useMutation,
   useQueryClient,
   isCancelledError,
 } from "@tanstack/react-query";
+
+/**
+ * Create an optimistic UserMessage entry for immediate display
+ */
+function createOptimisticUserMessage(message: string): ClaudeCode.UserMessage {
+  const uuid = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const now = new Date().toISOString();
+
+  return {
+    type: "user",
+    uuid,
+    parentUuid: null,
+    sessionId: "pending",
+    timestamp: now,
+    version: "0.0.0",
+    cwd: "/workspace",
+    isSidechain: false,
+    userType: "external",
+    message: {
+      role: "user",
+      content: message.trim(),
+    },
+  };
+}
 
 export function useSendMessage() {
   const queryClient = useQueryClient();
@@ -12,7 +36,6 @@ export function useSendMessage() {
     mutationFn: async ({
       taskId,
       message,
-      model,
     }: {
       taskId: string;
       message: string;
@@ -20,46 +43,43 @@ export function useSendMessage() {
     }) => {
       // This will be handled via socket, not direct API call
       // The actual sending happens through socket.emit in the component
-      return { taskId, message, model };
+      return { taskId, message };
     },
-    onMutate: async ({ taskId, message, model }) => {
+    onMutate: async ({ taskId, message }) => {
       try {
         await queryClient.cancelQueries({
-          queryKey: ["task-messages", taskId],
+          queryKey: ["session-entries", taskId],
         });
       } catch (error) {
         if (!isCancelledError(error)) {
           // Log unexpected errors but don't block optimistic update
-          console.error("Failed to cancel queries for task-messages", error);
+          console.error("Failed to cancel queries for session-entries", error);
         }
       }
 
-      const previousMessages = queryClient.getQueryData<Message[]>([
-        "task-messages",
+      const previousEntries = queryClient.getQueryData<SessionEntry[]>([
+        "session-entries",
         taskId,
       ]);
 
-      const optimisticMessage: Message = {
-        id: `temp-${Date.now()}`,
-        role: "user",
-        content: message.trim(),
-        llmModel: model,
-        createdAt: new Date().toISOString(),
-        metadata: { isStreaming: false },
-      };
+      // Create optimistic user message entry
+      const optimisticEntry = createOptimisticUserMessage(message);
 
-      queryClient.setQueryData<Message[]>(["task-messages", taskId], (old) => {
-        const currentMessages = old || [];
-        return [...currentMessages, optimisticMessage];
-      });
+      queryClient.setQueryData<SessionEntry[]>(
+        ["session-entries", taskId],
+        (old) => {
+          const currentEntries = old || [];
+          return [...currentEntries, optimisticEntry];
+        }
+      );
 
-      return { previousMessages };
+      return { previousEntries, optimisticUuid: optimisticEntry.uuid };
     },
     onError: (_err, variables, context) => {
-      if (context?.previousMessages) {
+      if (context?.previousEntries) {
         queryClient.setQueryData(
-          ["task-messages", variables.taskId],
-          context.previousMessages
+          ["session-entries", variables.taskId],
+          context.previousEntries
         );
       }
     },

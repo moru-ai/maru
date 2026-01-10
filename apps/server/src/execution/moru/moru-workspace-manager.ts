@@ -14,9 +14,6 @@ import {
   startMoruFilesystemWatcher,
   stopMoruFilesystemWatcher,
 } from "../../services/moru-filesystem-watcher";
-import {
-  stopMoruSessionWatcher,
-} from "../../services/moru-session-watcher";
 
 /**
  * MoruWorkspaceManager handles workspace lifecycle using Moru Sandbox VMs
@@ -72,8 +69,7 @@ export class MoruWorkspaceManager implements WorkspaceManager {
         console.warn(`[MORU_WORKSPACE] Failed to start filesystem watcher:`, watchError);
       }
 
-      // Note: Session watcher is started by AgentProcessManager when session_started is received
-      // This ensures the ~/.claude/projects directory exists (created by Claude Agent SDK)
+      // Note: Session polling is handled by agent-session.ts when messages are sent
 
       return {
         success: true,
@@ -104,14 +100,6 @@ export class MoruWorkspaceManager implements WorkspaceManager {
         console.log(`[MORU_WORKSPACE] Filesystem watcher stopped for task ${taskId}`);
       } catch (watchError) {
         console.warn(`[MORU_WORKSPACE] Failed to stop filesystem watcher:`, watchError);
-      }
-
-      // Stop session watcher
-      try {
-        await stopMoruSessionWatcher(taskId);
-        console.log(`[MORU_WORKSPACE] Session watcher stopped for task ${taskId}`);
-      } catch (sessionWatchError) {
-        console.warn(`[MORU_WORKSPACE] Failed to stop session watcher:`, sessionWatchError);
       }
 
       const sandbox = await this.getSandbox(taskId);
@@ -299,8 +287,8 @@ export class MoruWorkspaceManager implements WorkspaceManager {
       console.warn(`[MORU_WORKSPACE] Failed to restart filesystem watcher:`, watchError);
     }
 
-    // Note: Session watcher is managed by AgentProcessManager (started on session_started event)
-    // It doesn't need to be restarted here since it's tied to agent lifecycle
+    // Note: Session polling is handled by agent-session.ts when messages are sent
+    // It doesn't need to be restarted here since it's tied to the message lifecycle
   }
 
   /**

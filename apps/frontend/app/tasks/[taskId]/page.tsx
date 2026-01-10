@@ -19,7 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ImperativePanelGroupHandle } from "react-resizable-panels";
 import { StickToBottom } from "use-stick-to-bottom";
 import { MemoizedAgentEnvironment as AgentEnvironment } from "@/components/agent-environment/agent-environment";
-import { MemoizedTaskPageContent as TaskPageContent } from "@/components/task/task-content";
+import { MemoizedCCTaskPageContent as TaskPageContent } from "@/components/task/cc-task-content";
 import { useAgentEnvironment } from "@/components/agent-environment/agent-environment-context";
 import { useTaskTitle, useUpdateTaskTitle } from "@/hooks/tasks/use-task-title";
 import { useTaskStatus } from "@/hooks/tasks/use-task-status";

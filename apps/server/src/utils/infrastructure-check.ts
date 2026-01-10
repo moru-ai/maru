@@ -79,7 +79,7 @@ export async function ensureTaskInfrastructureExists(
 async function triggerReinitialization(
   taskId: string,
   userId: string,
-  anthropicApiKey?: string
+  _anthropicApiKey?: string
 ): Promise<void> {
   console.log(`[INFRA_CHECK] ${taskId}: Starting re-initialization`);
 
@@ -97,7 +97,7 @@ async function triggerReinitialization(
   // Use TaskInitializationEngine for re-initialization
   const initEngine = new TaskInitializationEngine();
 
-  await initEngine.initializeTask(taskId, MORU_INIT_STEPS, userId, anthropicApiKey);
+  await initEngine.initializeTask(taskId, MORU_INIT_STEPS, userId);
 
   console.log(
     `[INFRA_CHECK] ${taskId}: Re-initialization completed successfully`

@@ -847,6 +847,26 @@ export function useTaskSocket(taskId: string | undefined) {
       queryClient.invalidateQueries({ queryKey: ["codebases"] });
     }
 
+    // Handler for agent SDK session completion
+    function onSessionComplete(data: { taskId: string; sessionId: string; result?: unknown }) {
+      if (data.taskId !== taskId) return;
+
+      console.log("[SOCKET] Session complete:", data);
+
+      // Same logic as onStreamComplete - clear streaming and fetch updated data
+      setIsStreaming(false);
+      setIsCompletionPending(true);
+      if (taskId) {
+        socket.emit("get-chat-history", { taskId, complete: true });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["task", taskId] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["task-messages", taskId] });
+      queryClient.invalidateQueries({ queryKey: ["file-tree", taskId] });
+      queryClient.invalidateQueries({ queryKey: ["codebases"] });
+    }
+
     function onStreamError(error: unknown) {
       clearStreamingState();
       console.error("Stream error:", error);
@@ -966,6 +986,7 @@ export function useTaskSocket(taskId: string | undefined) {
     socket.on("message-error", onMessageError);
     socket.on("queued-action-processing", onQueuedActionProcessing);
     socket.on("task-status-updated", onTaskStatusUpdate);
+    socket.on("session-complete", onSessionComplete);
 
     return () => {
       socket.off("connect", onConnect);
@@ -978,6 +999,7 @@ export function useTaskSocket(taskId: string | undefined) {
       socket.off("message-error", onMessageError);
       socket.off("queued-action-processing", onQueuedActionProcessing);
       socket.off("task-status-updated", onTaskStatusUpdate);
+      socket.off("session-complete", onSessionComplete);
     };
   }, [socket, taskId, queryClient]);
 

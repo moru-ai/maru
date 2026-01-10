@@ -14,8 +14,7 @@ import config, { getCorsOrigins } from "./config";
 import { updateTaskStatus } from "./utils/task-status";
 import { parseApiKeysFromCookies } from "./utils/cookie-parser";
 import { modelContextService } from "./services/model-context-service";
-import { ensureTaskInfrastructureExists } from "./utils/infrastructure-check";
-import { agentProcessManager } from "./services/agent-process-manager";
+import * as agentSession from "./services/agent-session";
 
 interface ConnectionState {
   lastSeen: number;
@@ -50,8 +49,7 @@ function cleanupTaskStreamState(taskId: string): void {
 }
 
 async function getTerminalHistory(_taskId: string): Promise<TerminalEntry[]> {
-  // Terminal history is handled by moru-session-watcher for Moru mode
-  // Return empty array as terminal output is streamed directly
+  // Terminal history is streamed via session events
   return [];
 }
 
@@ -60,14 +58,14 @@ async function clearTerminal(_taskId: string): Promise<void> {
   // No server-side action needed
 }
 
-// Terminal updates are handled by moru-session-watcher for Moru mode
+// Terminal updates are streamed via session events
 // These functions are kept as no-ops for compatibility
 function startTerminalPolling(_taskId: string) {
-  // No-op: Moru mode uses moru-session-watcher for terminal output
+  // No-op: Terminal output is streamed via session events
 }
 
 function stopTerminalPolling(_taskId: string) {
-  // No-op: Moru mode uses moru-session-watcher for terminal output
+  // No-op: Terminal output is streamed via session events
 }
 
 async function verifyTaskAccess(
@@ -92,6 +90,7 @@ export function emitToTask(
   event: keyof ServerToClientEvents,
   data: unknown
 ) {
+  console.log(`[SOCKET] emitToTask: event=${event}, room=task-${taskId}`);
   io.to(`task-${taskId}`).emit(event, data);
 }
 
@@ -255,26 +254,15 @@ export function createSocketServer(
           return;
         }
 
-        // Ensure infrastructure exists (creates sandbox if needed)
-        await ensureTaskInfrastructureExists(data.taskId, task.userId, anthropicApiKey);
-
         await updateTaskStatus(data.taskId, "RUNNING", "SOCKET");
-        startTerminalPolling(data.taskId);
 
-        // Start agent if not already running
-        if (!agentProcessManager.isRunning(data.taskId)) {
-          console.log(`[SOCKET] Starting agent for task ${data.taskId}`);
-          const { moruWorkspaceManager } = await import("./execution/moru/moru-workspace-manager.js");
-          const sandbox = await moruWorkspaceManager.getSandbox(data.taskId);
-          if (!sandbox) {
-            socket.emit("message-error", { error: "Sandbox not found for task" });
-            return;
-          }
-          await agentProcessManager.startAgent(data.taskId, sandbox, anthropicApiKey);
-        }
-
-        // Send message to agent via AgentProcessManager
-        await agentProcessManager.sendMessage(data.taskId, data.message);
+        // Send message (creates sandbox internally, handles agent lifecycle, polling, completion)
+        await agentSession.sendMessage(
+          data.taskId,
+          task.userId,
+          data.message,
+          anthropicApiKey
+        );
 
       } catch (error) {
         console.error("Error processing user message:", error);
@@ -317,9 +305,6 @@ export function createSocketServer(
           socket.handshake.headers.cookie,
           data.llmModel as ModelType
         );
-
-        // Ensure task infrastructure exists before proceeding
-        await ensureTaskInfrastructureExists(data.taskId, task.userId);
 
         await updateTaskStatus(data.taskId, "RUNNING", "SOCKET");
         startTerminalPolling(data.taskId);
@@ -382,45 +367,12 @@ export function createSocketServer(
         socket.emit("chat-history", {
           taskId: data.taskId,
           messages: history,
-          // If complete is true, the queued action will automatically get sent, so set it to null so the frontend removes it from the queue UI
           queuedAction: data.complete
             ? null
             : chatService.getQueuedAction(data.taskId),
         });
 
-        // If this is a new task (complete: false) with an initial message,
-        // start the agent and send the initial message
-        if (!data.complete && history.length > 0) {
-          const lastMessage = history[history.length - 1]!;
-          // Check if the last message is from the user and hasn't been processed
-          if (lastMessage?.role === "user") {
-            const state = connectionStates.get(connectionId);
-            const anthropicApiKey = state?.apiKeys?.anthropic;
-
-            if (anthropicApiKey) {
-              console.log(`[SOCKET] Processing initial message for task ${data.taskId}`);
-
-              // Start agent if not running
-              if (!agentProcessManager.isRunning(data.taskId)) {
-                console.log(`[SOCKET] Starting agent for task ${data.taskId}`);
-                const { moruWorkspaceManager } = await import("./execution/moru/moru-workspace-manager.js");
-                const sandbox = await moruWorkspaceManager.getSandbox(data.taskId);
-                if (sandbox) {
-                  await agentProcessManager.startAgent(data.taskId, sandbox, anthropicApiKey);
-                  // Send the initial message to the agent
-                  const messageContent = typeof lastMessage.content === "string"
-                    ? lastMessage.content
-                    : JSON.stringify(lastMessage.content);
-                  await agentProcessManager.sendMessage(data.taskId, messageContent);
-                } else {
-                  console.warn(`[SOCKET] Sandbox not found for task ${data.taskId}`);
-                }
-              }
-            } else {
-              console.log(`[SOCKET] No API key available, waiting for user to send message`);
-            }
-          }
-        }
+        // Note: Initial message is now processed by /initiate endpoint (via after() in create-task)
       } catch (error) {
         console.error(
           `[SOCKET] Error getting chat history for task ${data.taskId}:`,
@@ -443,8 +395,8 @@ export function createSocketServer(
         }
 
         // Interrupt the agent if running
-        if (agentProcessManager.isRunning(data.taskId)) {
-          await agentProcessManager.interrupt(data.taskId);
+        if (agentSession.isProcessing(data.taskId)) {
+          await agentSession.interrupt(data.taskId);
         }
 
         endStream(data.taskId);

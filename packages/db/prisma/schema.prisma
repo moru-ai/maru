@@ -112,6 +112,12 @@ model Task {
   codebaseUnderstandingId String?
   codebaseUnderstanding   CodebaseUnderstanding? @relation(fields: [codebaseUnderstandingId], references: [id])
   sessionEvents           SessionEvent[]
+
+  // Claude session ID for resume
+  sessionId String?
+
+  // Initial message for auto-processing via /initiate
+  initialMessage String?
 }
 
 model Todo {
@@ -289,13 +295,14 @@ model SessionEvent {
   id        String   @id @default(cuid())
   taskId    String
   userId    String
+  sessionId String?  // Optional for backwards compatibility with existing rows
   timestamp DateTime
   data      Json
   createdAt DateTime @default(now())
 
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  @@index([taskId, timestamp])
+  @@index([taskId, sessionId, timestamp])
   @@index([userId])
   @@map("session_event")
 }

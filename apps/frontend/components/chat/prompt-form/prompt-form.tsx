@@ -11,12 +11,8 @@ import { type ModelType } from "@repo/types";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUp,
-  ListEnd,
   Loader2,
-  MessageCircle,
-  MessageCircleX,
   Square,
-  X,
 } from "lucide-react";
 import { redirect, useParams } from "next/navigation";
 import {
@@ -28,7 +24,6 @@ import {
   TransitionStartFunction,
 } from "react";
 import { toast } from "sonner";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
 import { QueuedAction } from "../messages/queued-message";
 import { ModelSelector } from "./model-selector";
 import { useSelectedModel } from "@/hooks/chat/use-selected-model";
@@ -90,99 +85,6 @@ export function PromptForm({
 
   const queryClient = useQueryClient();
 
-  const [isMessageOptionsOpen, setIsMessageOptionsOpen] = useState(false);
-
-  const messageOptions = useMemo(() => {
-    const queueAction = () => {
-      if (!selectedModel) {
-        toast.error("Please select a model first");
-        return;
-      }
-      onSubmit?.(message, selectedModel, true);
-      queryClient.setQueryData(["queued-action", taskId], {
-        type: "message",
-        message,
-        model: selectedModel,
-      });
-      setMessage("");
-    };
-
-    const sendAction = () => {
-      if (!selectedModel) {
-        toast.error("Please select a model first");
-        return;
-      }
-      onSubmit?.(message, selectedModel, false);
-      setMessage("");
-    };
-
-    return isStreaming
-      ? [
-          {
-            id: "queue",
-            icon: ListEnd,
-            label: "Queue Message",
-            action: queueAction,
-            shortcut: {
-              key: "Enter",
-              meta: false,
-              ctrl: false,
-              alt: false,
-              shift: false,
-            },
-          },
-          {
-            id: "send",
-            icon: MessageCircleX,
-            label: "Stop & Send",
-            action: sendAction,
-            shortcut: {
-              key: "Enter",
-              meta: true,
-              ctrl: false,
-              alt: false,
-              shift: false,
-            },
-          },
-        ]
-      : [
-          {
-            id: "send",
-            icon: MessageCircle,
-            label: "Send Message",
-            action: sendAction,
-            shortcut: {
-              key: "Enter",
-              meta: false,
-              ctrl: false,
-              alt: false,
-              shift: false,
-            },
-          },
-        ];
-  }, [isStreaming, onSubmit, message, selectedModel, queryClient, taskId]);
-
-  const formatShortcut = useCallback(
-    (shortcut: {
-      key: string;
-      meta: boolean;
-      ctrl: boolean;
-      alt: boolean;
-      shift: boolean;
-    }) => {
-      const modifiers = [];
-      if (shortcut.meta) modifiers.push("⌘");
-      if (shortcut.ctrl) modifiers.push("⌃");
-      if (shortcut.alt) modifiers.push("⌥");
-      if (shortcut.shift) modifiers.push("⇧");
-
-      const keyDisplay = shortcut.key === "Enter" ? "⏎" : shortcut.key;
-      return modifiers.length > 0
-        ? `${modifiers.join("")}${keyDisplay}`
-        : keyDisplay;
-    },
-    []
-  );
 
   const handleInitiateTask = useCallback(
     (e: React.FormEvent) => {
@@ -227,7 +129,17 @@ export function PromptForm({
     [message, selectedModel, queryClient, isPending, startTransition]
   );
 
-  // Submission handling for home page
+  // Direct send action (no modal)
+  const handleSendMessage = useCallback(() => {
+    if (!selectedModel) {
+      toast.error("Please select a model first");
+      return;
+    }
+    onSubmit?.(message, selectedModel, false);
+    setMessage("");
+  }, [onSubmit, message, selectedModel]);
+
+  // Submission handling
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
@@ -237,11 +149,11 @@ export function PromptForm({
         if (isStreaming && !message.trim()) {
           onStopStream?.();
         } else if (message.trim()) {
-          handleOpenMessageOptions();
+          handleSendMessage();
         }
       }
     },
-    [isHome, message, handleInitiateTask, isStreaming, onStopStream]
+    [isHome, message, handleInitiateTask, isStreaming, onStopStream, handleSendMessage]
   );
 
   // Textarea's onKeyDown handler for home page
@@ -255,57 +167,23 @@ export function PromptForm({
     [isHome, handleSubmit]
   );
 
-  const handleOpenMessageOptions = useCallback(() => {
-    if (!isHome && message.trim()) {
-      setIsMessageOptionsOpen(true);
-    }
-  }, [isHome, message.trim()]);
 
-  // Keyboard shortcuts, including submission handling for task page
+  // Keyboard shortcuts for task page
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
       // For home page, enter handled by handleSubmit
       if (isHome) return;
 
-      if (
-        (event.key === "Escape" ||
-          event.key === "Delete" ||
-          event.key === "Backspace") &&
-        isMessageOptionsOpen
-      ) {
+      // Send message directly on Enter (no modal) - blocked while streaming
+      if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
-        setIsMessageOptionsOpen(false);
-      }
-
-      // Keyboard shortcuts when message options are open
-      if (isMessageOptionsOpen) {
-        for (const option of messageOptions) {
-          const shortcut = option.shortcut;
-
-          // Check if the key and all modifiers match
-          if (
-            event.key === shortcut.key &&
-            (shortcut.meta ? event.metaKey : !event.metaKey) &&
-            (shortcut.ctrl ? event.ctrlKey : !event.ctrlKey) &&
-            (shortcut.alt ? event.altKey : !event.altKey) &&
-            (shortcut.shift ? event.shiftKey : !event.shiftKey)
-          ) {
-            event.preventDefault();
-            option.action();
-            setIsMessageOptionsOpen(false);
-            // TODO: Handle option-specific logic
-            break;
-          }
+        if (message.trim() && !isStreaming) {
+          handleSendMessage();
         }
-      } else {
-        if (event.key === "Enter" && !event.shiftKey) {
-          event.preventDefault();
-          handleOpenMessageOptions();
-        } else if (event.key === "Escape" && event.metaKey) {
-          event.preventDefault();
-          if (isStreaming) {
-            onStopStream?.();
-          }
+      } else if (event.key === "Escape" && event.metaKey) {
+        event.preventDefault();
+        if (isStreaming) {
+          onStopStream?.();
         }
       }
     };
@@ -314,21 +192,20 @@ export function PromptForm({
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [
     isHome,
-    isMessageOptionsOpen,
-    messageOptions,
+    message,
     isStreaming,
-    handleOpenMessageOptions,
+    handleSendMessage,
+    onStopStream,
   ]);
 
   const isSubmitButtonDisabled = useMemo(
     () =>
-      isMessageOptionsOpen ||
       isPending ||
       !selectedModel ||
       isInitializing ||
-      (isHome ? !message.trim() : !isStreaming && !message.trim()),
+      !message.trim() ||
+      (!isHome && isStreaming),
     [
-      isMessageOptionsOpen,
       isPending,
       selectedModel,
       isInitializing,
@@ -363,68 +240,6 @@ export function PromptForm({
             isPending && "opacity-50"
           )}
         >
-          {/* Message options */}
-          {!isHome && (
-            <div
-              className={cn(
-                "ease-out-expo select-none overflow-clip transition-all duration-500",
-                isMessageOptionsOpen
-                  ? isStreaming
-                    ? "h-[126px]"
-                    : "h-[96px]"
-                  : "h-0"
-              )}
-            >
-              <div className="flex flex-col gap-0.5 p-1.5">
-                <div className="text-muted-foreground flex w-full items-center justify-between gap-1 pl-1.5 text-xs font-medium">
-                  <span>Select Message Option</span>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="iconXs"
-                        tabIndex={-1}
-                        className="text-muted-foreground hover:text-foreground hover:bg-sidebar-border p-0"
-                        onClick={() => setIsMessageOptionsOpen(false)}
-                      >
-                        <X className="size-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" align="end" shortcut="esc">
-                      Cancel
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                {messageOptions.map((option) => {
-                  const IconComponent = option.icon;
-                  return (
-                    <Button
-                      key={option.id}
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      tabIndex={-1}
-                      onClick={() => {
-                        option.action();
-                        setIsMessageOptionsOpen(false);
-                      }}
-                      className="hover:bg-sidebar-border justify-between font-normal"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <IconComponent className="size-4" />
-                        <span>{option.label}</span>
-                      </div>
-                      <span className="text-muted-foreground">
-                        {formatShortcut(option.shortcut)}
-                      </span>
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {isHome && (
             <>
               <div className="bg-background absolute inset-px -z-10 rounded-[calc(var(--radius)+1px)]" />
@@ -442,7 +257,7 @@ export function PromptForm({
               autoFocus
               value={message}
               onChange={(e) => {
-                if (!isMessageOptionsOpen && !isPending) {
+                if (!isPending) {
                   setMessage(e.target.value);
                 }
               }}

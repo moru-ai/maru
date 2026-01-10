@@ -6,7 +6,6 @@ import http from "http";
 import { z } from "zod";
 import config, { getCorsOrigins } from "./config";
 import { ChatService } from "./agent/chat";
-import { TaskInitializationEngine } from "./initialization";
 import { errorHandler } from "./middleware/error-handler";
 import { apiKeyAuth } from "./middleware/api-key-auth";
 import { createSocketServer } from "./socket";
@@ -15,10 +14,10 @@ import { hasReachedTaskLimit } from "./services/task-limit";
 import { createWorkspaceManager } from "./execution";
 import { filesRouter } from "./files/router";
 import { modelContextService } from "./services/model-context-service";
+import * as agentSession from "./services/agent-session";
 
 const app = express();
 export const chatService = new ChatService();
-const initializationEngine = new TaskInitializationEngine();
 
 const initiateTaskSchema = z.object({
   message: z.string().min(1, "Message is required"),
@@ -85,13 +84,13 @@ app.get("/api/tasks/:taskId", async (req, res) => {
   }
 });
 
-// Initiate task with agent using new initialization system
+// Initiate task - creates sandbox and processes initial message
 app.post("/api/tasks/:taskId/initiate", async (req, res) => {
   try {
-    console.log("RECEIVED TASK INITIATE REQUEST: /api/tasks/:taskId/initiate");
+    console.log("[TASK_INITIATE] Received request");
     const { taskId } = req.params;
 
-    // Validate request body with Zod
+    // Validate request body
     const validation = initiateTaskSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({
@@ -103,99 +102,80 @@ app.post("/api/tasks/:taskId/initiate", async (req, res) => {
       });
     }
 
-    const { message: _message, model, userId } = validation.data;
+    const { model, userId } = validation.data;
 
-    // Check task limit before processing (production only)
+    // Check task limit
     const isAtLimit = await hasReachedTaskLimit(userId);
     if (isAtLimit) {
       return res.status(429).json({
         error: "Task limit reached",
-        message:
-          "You have reached the maximum number of active tasks. Please complete or archive existing tasks to create new ones.",
+        message: "You have reached the maximum number of active tasks.",
       });
     }
 
+    // Get task with initial message
     const task = await prisma.task.findUnique({
       where: { id: taskId },
+      select: { initialMessage: true, userId: true }
     });
 
     if (!task) {
       return res.status(404).json({ error: "Task not found" });
     }
 
-    console.log(`[TASK_INITIATE] Starting task ${taskId}`);
+    if (!task.initialMessage) {
+      return res.status(400).json({ error: "No initial message to process" });
+    }
 
-    try {
-      const initContext = await modelContextService.createContext(
-        taskId,
-        req.headers.cookie,
-        model as ModelType
-      );
+    // Get API key from cookies
+    const initContext = await modelContextService.createContext(
+      taskId,
+      req.headers.cookie,
+      model as ModelType
+    );
 
-      if (!initContext.validateAccess()) {
-        const provider = initContext.getProvider();
-        const providerName =
-          provider === "anthropic"
-            ? "Anthropic"
-            : provider === "openrouter"
-              ? "OpenRouter"
-              : "OpenAI";
+    if (!initContext.validateAccess()) {
+      const provider = initContext.getProvider();
+      const providerName =
+        provider === "anthropic"
+          ? "Anthropic"
+          : provider === "openrouter"
+            ? "OpenRouter"
+            : "OpenAI";
 
-        await updateTaskStatus(taskId, "FAILED", "INIT");
-
-        return res.status(400).json({
-          error: `${providerName} API key required`,
-          details: `Please configure your ${providerName} API key in settings to use ${model}.`,
-        });
-      }
-
-      await updateTaskStatus(taskId, "INITIALIZING", "INIT");
-      console.log(
-        `⏳ [TASK_INITIATE] Task ${taskId} status set to INITIALIZING - starting initialization...`
-      );
-
-      const initSteps = await initializationEngine.getDefaultStepsForTask();
-      await initializationEngine.initializeTask(taskId, initSteps, userId);
-
-      await updateTaskStatus(taskId, "RUNNING", "INIT");
-
-      // NOTE: We no longer call chatService.processUserMessage() here.
-      // The new agent flow is triggered via socket when user sends a message.
-      // The agent will be started on-demand in the socket handler.
-
-      res.json({
-        success: true,
-        message: "Task initiated successfully",
-      });
-    } catch (initError) {
-      console.error(
-        `[TASK_INITIATE] Initialization failed for task ${taskId}:`,
-        initError
-      );
-      console.log(
-        `❌ [TASK_INITIATE] Task ${taskId} initialization failed - setting status to FAILED`
-      );
-
-      await updateTaskStatus(taskId, "FAILED", "INIT");
-
-      if (
-        initError instanceof Error &&
-        (initError.message.includes("authentication") ||
-          initError.message.includes("access token") ||
-          initError.message.includes("refresh"))
-      ) {
-        return res.status(401).json({
-          error: "GitHub authentication failed",
-          details: "Please reconnect your GitHub account and try again",
-        });
-      }
-
-      return res.status(500).json({
-        error: "Task initialization failed",
-        details:
-          initError instanceof Error ? initError.message : "Unknown error",
+      return res.status(400).json({
+        error: `${providerName} API key required`,
+        details: `Please configure your ${providerName} API key in settings to use ${model}.`,
       });
     }
+
+    const anthropicApiKey = initContext.getProviderApiKey();
+    if (!anthropicApiKey) {
+      return res.status(400).json({ error: "API key not available" });
+    }
+
+    // Return immediately
+    await updateTaskStatus(taskId, "RUNNING", "INIT");
+    res.json({ success: true });
+
+    // Process initial message in background
+    console.log(`[TASK_INITIATE] Processing initial message for task ${taskId}`);
+    agentSession.sendMessage(
+      taskId,
+      task.userId,
+      task.initialMessage,
+      anthropicApiKey
+    ).then(() => {
+      // Clear initial message after processing
+      prisma.task.update({
+        where: { id: taskId },
+        data: { initialMessage: null }
+      }).catch(err => console.error(`[TASK_INITIATE] Failed to clear initialMessage:`, err));
+    }).catch(err => {
+      console.error(`[TASK_INITIATE] Error processing initial message:`, err);
+      updateTaskStatus(taskId, "FAILED", "INIT");
+    });
+
   } catch (error) {
     console.error("Error initiating task:", error);
     res.status(500).json({ error: "Failed to initiate task" });
@@ -210,6 +190,54 @@ app.get("/api/tasks/:taskId/messages", async (req, res) => {
   } catch (error) {
     console.error("Error fetching messages:", error);
     res.status(500).json({ error: "Failed to fetch messages" });
+  }
+});
+
+// Get session entries for Claude Agent SDK
+app.get("/api/tasks/:taskId/session-entries", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+
+    // Get all events for this task
+    const allEvents = await prisma.sessionEvent.findMany({
+      where: { taskId },
+      orderBy: { timestamp: "asc" },
+    });
+
+    if (allEvents.length === 0) {
+      res.json([]);
+      return;
+    }
+
+    // Find the latest sessionId from the events
+    // Session entries have sessionId in the data field
+    let latestSessionId: string | null = null;
+    let latestTimestamp: Date | null = null;
+
+    for (const event of allEvents) {
+      const data = event.data as { sessionId?: string };
+      if (data.sessionId) {
+        if (!latestTimestamp || event.timestamp > latestTimestamp) {
+          latestTimestamp = event.timestamp;
+          latestSessionId = data.sessionId;
+        }
+      }
+    }
+
+    // Filter to only include entries from the latest session
+    const filteredEvents = latestSessionId
+      ? allEvents.filter((event) => {
+          const data = event.data as { sessionId?: string };
+          return data.sessionId === latestSessionId;
+        })
+      : allEvents;
+
+    console.log(`[SESSION_ENTRIES] Task ${taskId}: ${allEvents.length} total, ${filteredEvents.length} from latest session ${latestSessionId?.substring(0, 8)}...`);
+
+    res.json(filteredEvents.map((event) => event.data));
+  } catch (error) {
+    console.error("Error fetching session entries:", error);
+    res.status(500).json({ error: "Failed to fetch session entries" });
   }
 });
 
