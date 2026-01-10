@@ -48,7 +48,7 @@ function AgentEnvironment({
     shouldUseSheet,
   } = useAgentEnvironment();
 
-  const { data: treeData, error: treeError } = useFileTree(taskId, { polling: true });
+  const { data: treeData, error: treeError, isLoading: isTreeLoading } = useFileTree(taskId, { polling: true });
   const { data } = useTaskStatus(taskId);
   const { status } = data || {};
   const isLoading = status === "INITIALIZING";
@@ -182,6 +182,7 @@ function AgentEnvironment({
           selectedFilePath={selectedFilePath}
           isCollapsed={isExplorerCollapsed}
           onToggleCollapse={() => setIsExplorerCollapsed(!isExplorerCollapsed)}
+          isLoading={isTreeLoading}
         />
         <div className="flex-1 overflow-hidden">
           <ResizablePanelGroup

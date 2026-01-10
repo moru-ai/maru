@@ -27,6 +27,7 @@ type AgentEnvironmentProps = BaseProps & {
   selectedFilePath: string | null;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  isLoading?: boolean;
 };
 
 type OtherViewProps = BaseProps & {
@@ -212,9 +213,13 @@ export function FileExplorer(props: AgentEnvironmentProps | OtherViewProps) {
             <div className="group/files flex w-full grow flex-col gap-0.5 overflow-y-auto p-1">
               {files.map((file) => renderNode(file))}
             </div>
-          ) : (
+          ) : props.isLoading ? (
             <div className="flex w-full justify-center p-4">
               <Loader2 className="text-muted-foreground size-3.5 animate-spin" />
+            </div>
+          ) : (
+            <div className="text-muted-foreground flex w-full justify-center p-4 text-sm">
+              No files
             </div>
           )}
         </div>
