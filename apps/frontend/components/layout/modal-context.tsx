@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState } from "react";
 import { ApiKeyProvider } from "@repo/types";
 
-type SettingsTab = "user" | "models" | "github";
+type SettingsTab = "user" | "models";
 
 interface ModalContextType {
   // Settings modal state
@@ -25,10 +25,10 @@ interface ModalProviderProps {
 
 export function ModalProvider({ children }: ModalProviderProps) {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [settingsModalTab, setSettingsModalTab] = useState<SettingsTab>("user");
+  const [settingsModalTab, setSettingsModalTab] = useState<SettingsTab>("models");
   const [providerConfigView, setProviderConfigView] = useState<ApiKeyProvider | null>(null);
 
-  const openSettingsModal = (tab: SettingsTab = "user") => {
+  const openSettingsModal = (tab: SettingsTab = "models") => {
     setSettingsModalTab(tab);
     setProviderConfigView(null);
     setIsSettingsModalOpen(true);

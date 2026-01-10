@@ -6,20 +6,12 @@ import { useModal } from "@/components/layout/modal-context";
 import { Box, CornerDownRight, ChevronLeft, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Fragment, useEffect } from "react";
-import { GithubLogo } from "../../graphics/github/github-logo";
 import { UserSettings } from "./user-settings";
 import { ModelSettings } from "./model-settings";
-import { GitHubSettings } from "./github-settings";
 import { ProviderConfig } from "./provider-config";
 import { API_KEY_PROVIDER_NAMES } from "@repo/types";
 
 const tabs = [
-  {
-    title: "GitHub Connection",
-    sidebarLabel: "GitHub",
-    icon: <GithubLogo className="size-4" />,
-    value: "github",
-  },
   {
     title: "Models",
     sidebarLabel: "Models",
@@ -70,10 +62,8 @@ export function SettingsModal() {
         return <UserSettings />;
       case "models":
         return <ModelSettings />;
-      case "github":
-        return <GitHubSettings />;
       default:
-        return <UserSettings />;
+        return <ModelSettings />;
     }
   };
 
@@ -122,9 +112,7 @@ export function SettingsModal() {
                     )}
                     onClick={() => {
                       closeProviderConfig();
-                      setSettingsModalTab(
-                        tab.value as "user" | "models" | "github"
-                      );
+                      setSettingsModalTab(tab.value as "user" | "models");
                     }}
                   >
                     {tab.icon}
