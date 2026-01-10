@@ -1,11 +1,9 @@
 import { SidebarViews } from "@/components/sidebar";
 import { AgentEnvironmentProvider } from "@/components/agent-environment/agent-environment-context";
 import { TaskSocketProvider } from "@/contexts/task-socket-context";
-import { getApiKeys, getModels } from "@/lib/actions/api-keys";
 import { getUser } from "@/lib/auth/get-user";
-import { getTaskMessages } from "@/lib/db-operations/get-task-messages";
-import { getTaskWithDetails } from "@/lib/db-operations/get-task-with-details";
 import { getTasks } from "@/lib/db-operations/get-tasks";
+import { db } from "@repo/db";
 import {
   dehydrate,
   HydrationBoundary,
@@ -24,13 +22,11 @@ export default async function TaskLayout({
 
   const user = await getUser();
 
-  // Note: Todos are now derived from session entries on the client
-  const [initialTasks, { task, fileChanges, diffStats }, taskMessages] =
-    await Promise.all([
-      user ? getTasks(user.id) : [],
-      getTaskWithDetails(taskId),
-      getTaskMessages(taskId),
-    ]);
+  // Fetch only essential data - session entries and file changes are fetched client-side
+  const [initialTasks, task] = await Promise.all([
+    user ? getTasks(user.id) : [],
+    db.task.findUnique({ where: { id: taskId } }),
+  ]);
 
   if (!task) {
     notFound();
@@ -38,46 +34,18 @@ export default async function TaskLayout({
 
   const queryClient = new QueryClient();
 
-  const prefetchPromises = [
-    queryClient.prefetchQuery({
-      queryKey: ["task", taskId],
-      queryFn: () => ({
-        task,
-        fileChanges,
-        diffStats,
-      }),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["task-messages", taskId],
-      queryFn: () => taskMessages,
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["task-title", taskId],
-      queryFn: () => task.title,
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["task-status", taskId],
-      queryFn: () => ({
-        status: task.status,
-        initStatus: task.initStatus,
-        initializationError: task.initializationError,
-      }),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["api-keys"],
-      queryFn: getApiKeys,
-    }),
-    queryClient
-      .prefetchQuery({
-        queryKey: ["models"],
-        queryFn: getModels,
-      })
-      .catch(() => {
-        // Could not prefetch models
-      }),
-  ];
-
-  await Promise.allSettled(prefetchPromises);
+  // Prefetch task data synchronously (already have data, no extra queries)
+  queryClient.setQueryData(["task", taskId], {
+    task,
+    fileChanges: [],
+    diffStats: { additions: 0, deletions: 0, totalFiles: 0 },
+  });
+  queryClient.setQueryData(["task-title", taskId], task.title);
+  queryClient.setQueryData(["task-status", taskId], {
+    status: task.status,
+    initStatus: task.initStatus,
+    initializationError: task.initializationError,
+  });
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

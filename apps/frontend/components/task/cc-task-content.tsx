@@ -50,21 +50,21 @@ function CCTaskPageContent() {
   } = useSessionEntries(taskId);
 
   // Combine initial message with entries if no entries yet
+  const initialMessage = (task as { initialMessage?: string | null })?.initialMessage;
+
   const entries = useMemo(() => {
     // If we have entries, use them directly
     if (rawEntries.length > 0) {
       return rawEntries;
     }
 
-    // If task has initialMessage and no entries yet, show it as pending
-    // Cast task to access initialMessage which may not be in the type yet
-    const initialMessage = (task as { initialMessage?: string | null })?.initialMessage;
-    if (initialMessage && !entriesLoading) {
+    // Show initial message immediately if available (don't wait for entries to load)
+    if (initialMessage) {
       return [createPendingInitialMessage(initialMessage)];
     }
 
     return rawEntries;
-  }, [rawEntries, task, entriesLoading]);
+  }, [rawEntries, initialMessage]);
 
   const sendMessageMutation = useSendMessage();
 
@@ -132,21 +132,17 @@ function CCTaskPageContent() {
 
         {hasContent ? (
           <CCMessages entries={entries} />
-        ) : entriesLoading ? (
+        ) : entriesLoading && !initialMessage ? (
           <div className='relative w-full rounded-lg p-px user-message-border'>
             <div className='shimmer-skeleton relative z-0 w-full overflow-clip rounded-lg px-3 py-2'>
               <div className='h-5 w-full' />
             </div>
             <div className='bg-background absolute inset-px -z-10 rounded-[calc(var(--radius)+1px)]' />
           </div>
-        ) : task?.status === 'RUNNING' ? (
-          <div className='shimmer flex h-7 w-fit items-center px-3 text-[13px]'>
-            Waiting for agent...
-          </div>
         ) : null}
 
-        {/* Show generating indicator when streaming but no new content yet */}
-        {isStreaming && entries.length > 0 && (
+        {/* Show processing indicator when waiting for agent response */}
+        {(isStreaming || (initialMessage && rawEntries.length === 0)) && (
           <div className='shimmer flex h-7 w-fit items-center px-3 text-[13px]'>
             Processing...
           </div>
@@ -160,7 +156,7 @@ function CCTaskPageContent() {
           <PromptForm
             onSubmit={handleSendMessage}
             onStopStream={handleStopStream}
-            isStreaming={isStreaming || sendMessageMutation.isPending}
+            isStreaming={isStreaming || sendMessageMutation.isPending || (!!initialMessage && rawEntries.length === 0)}
             initialSelectedModel={task?.mainModel as ModelType | null}
             onFocus={() => {
               queryClient.setQueryData(['edit-message-id', taskId], null);
