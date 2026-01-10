@@ -30,10 +30,12 @@ export function SidebarTasksView({
   tasks,
   loading,
   error,
+  currentTaskId,
 }: {
   tasks: Task[];
   loading: boolean;
   error: Error | null;
+  currentTaskId?: string | null;
 }) {
   const searchFormRef = useRef<HTMLFormElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -85,6 +87,7 @@ export function SidebarTasksView({
   const renderTaskItem = (task: Task) => {
     const displayStatus = getDisplayStatus(task);
     const StatusIcon = statusColorsConfig[displayStatus].icon;
+    const isCurrentTask = task.id === currentTaskId;
     return (
       <SidebarMenuItem key={task.id}>
         <ContextMenu>
@@ -93,7 +96,11 @@ export function SidebarTasksView({
               className="flex h-auto flex-col items-start gap-0 overflow-hidden"
               asChild
             >
-              <a href={`/tasks/${task.id}`} className="w-full overflow-hidden">
+              <a
+                href={`/tasks/${task.id}`}
+                className="w-full overflow-hidden"
+                onClick={isCurrentTask ? (e) => e.preventDefault() : undefined}
+              >
                 <div className="flex w-full items-center gap-1.5">
                   <div className="line-clamp-1 flex-1">{task.title}</div>
                 </div>

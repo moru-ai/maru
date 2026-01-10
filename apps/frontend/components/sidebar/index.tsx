@@ -106,6 +106,7 @@ export function SidebarViews({
                 tasks={tasks}
                 loading={isLoadingTasks}
                 error={tasksError}
+                currentTaskId={currentTaskId}
               />
             )}
           </div>
