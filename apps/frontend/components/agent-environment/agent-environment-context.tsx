@@ -10,8 +10,10 @@ import {
   useMemo,
   useRef,
   useCallback,
+  useEffect,
 } from "react";
 import { ImperativePanelHandle } from "react-resizable-panels";
+import { useFileTree } from "@/hooks/agent-environment/use-file-tree";
 
 type FileWithContent = {
   name: string;
@@ -30,8 +32,6 @@ type AgentEnvironmentContextType = {
   lastPanelSizeRef: React.RefObject<number | null>;
   expandRightPanel: () => void;
   openAgentEnvironment: () => void;
-  triggerTerminalResize: () => void;
-  terminalResizeTrigger: number;
   // Sheet management - exposed for page components
   isSheetOpen: boolean;
   setIsSheetOpen: (open: boolean) => void;
@@ -53,7 +53,6 @@ export function AgentEnvironmentProvider({
   const rightPanelRef = useRef<ImperativePanelHandle>(null);
 
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
-  const [terminalResizeTrigger, setTerminalResizeTrigger] = useState(0);
   
   // Sheet management
   const shouldUseSheet = useIsMobile({ breakpoint: 1024 });
@@ -114,15 +113,23 @@ export function AgentEnvironmentProvider({
     expandRightPanel();
   }, [shouldUseSheet, expandRightPanel]);
 
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const triggerTerminalResize = useCallback(() => {
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
+  // Watch file tree and auto-open panel when files appear
+  const { data: treeData } = useFileTree(taskId, { polling: true });
+  const hasAutoOpenedRef = useRef(false);
+  const prevTreeLengthRef = useRef<number>(0);
+
+  useEffect(() => {
+    const currentLength = treeData?.tree?.length ?? 0;
+    const prevLength = prevTreeLengthRef.current;
+
+    // Auto-open when files first appear (0 -> >0)
+    if (prevLength === 0 && currentLength > 0 && !hasAutoOpenedRef.current) {
+      hasAutoOpenedRef.current = true;
+      openAgentEnvironment();
     }
-    debounceTimeoutRef.current = setTimeout(() => {
-      setTerminalResizeTrigger((prev) => prev + 1);
-    }, 200);
-  }, []);
+
+    prevTreeLengthRef.current = currentLength;
+  }, [treeData?.tree?.length, openAgentEnvironment]);
 
   const value: AgentEnvironmentContextType = useMemo(
     () => ({
@@ -135,8 +142,6 @@ export function AgentEnvironmentProvider({
       lastPanelSizeRef,
       expandRightPanel,
       openAgentEnvironment,
-      triggerTerminalResize,
-      terminalResizeTrigger,
       isSheetOpen,
       setIsSheetOpen,
       shouldUseSheet,
@@ -151,8 +156,6 @@ export function AgentEnvironmentProvider({
       lastPanelSizeRef,
       expandRightPanel,
       openAgentEnvironment,
-      triggerTerminalResize,
-      terminalResizeTrigger,
       isSheetOpen,
       shouldUseSheet,
     ]
