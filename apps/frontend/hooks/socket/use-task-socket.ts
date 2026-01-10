@@ -769,9 +769,10 @@ export function useTaskSocket(taskId: string | undefined) {
     }
 
     function onStreamComplete() {
-      // Don't clear streaming state immediately - wait for server response
-      setIsStreaming(false);
-      setIsCompletionPending(true);
+      // Clear streaming state immediately to stop showing "processing" indicator
+      clearStreamingState();
+
+      // Fetch updated data from server
       if (taskId) {
         socket.emit("get-chat-history", { taskId, complete: true });
       }
@@ -789,9 +790,10 @@ export function useTaskSocket(taskId: string | undefined) {
 
       console.log("[SOCKET] Session complete:", data);
 
-      // Same logic as onStreamComplete - clear streaming and fetch updated data
-      setIsStreaming(false);
-      setIsCompletionPending(true);
+      // Clear streaming state immediately to stop showing "processing" indicator
+      clearStreamingState();
+
+      // Fetch updated data from server
       if (taskId) {
         socket.emit("get-chat-history", { taskId, complete: true });
       }
@@ -944,6 +946,8 @@ export function useTaskSocket(taskId: string | undefined) {
     (message: string, model: string, queue: boolean = false) => {
       if (!socket || !taskId || !message.trim()) return;
 
+      // Clear previous session state before starting new stream
+      clearStreamingState();
       setIsStreaming(true);
       socket.emit("user-message", {
         taskId,
@@ -952,7 +956,7 @@ export function useTaskSocket(taskId: string | undefined) {
         queue,
       });
     },
-    [socket, taskId]
+    [socket, taskId, clearStreamingState]
   );
 
   const stopStream = useCallback(() => {

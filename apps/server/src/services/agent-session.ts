@@ -114,12 +114,15 @@ export async function sendMessage(
       stopped = true;
       if (pollTimer) clearTimeout(pollTimer);
 
-      // Final read, save workspace, kill sandbox
+      // Final read, emit completion, save workspace, kill sandbox
       (async () => {
+        // Read final entries before emitting completion
         linesRead = await pollFile(taskId, userId, sessionId!, sandbox, linesRead);
 
+        // Emit after pollFile so client has all entries
+        emitToTask(taskId, "session-complete", { taskId, sessionId, result: msg.result });
+
         // Save workspace to storage before killing sandbox
-        let workspaceSaved = false;
         if (isSandboxStorageConfigured()) {
           try {
             const storage = createSandboxStorage();
@@ -133,7 +136,6 @@ export async function sendMessage(
                 data: { workspaceArchiveId: saveResult.archiveId }
               });
               console.log(`[AGENT_SESSION] Saved workspace: ${saveResult.archiveId} (${saveResult.sizeBytes} bytes)`);
-              workspaceSaved = true;
             } else {
               console.warn(`[AGENT_SESSION] Failed to save workspace: ${saveResult.error}`);
             }
@@ -150,7 +152,6 @@ export async function sendMessage(
           console.warn(`[AGENT_SESSION] Failed to kill sandbox:`, error);
         }
 
-        emitToTask(taskId, "session-complete", { taskId, sessionId, result: msg.result, workspaceSaved });
         done();
       })();
     }
