@@ -6,6 +6,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useTask } from "@/hooks/tasks/use-task";
+import { useSessionEntries } from "@/hooks/session/use-session-entries";
+import { extractTodosFromEntries } from "@/components/claude-code/cc-todo-panel";
 import { cn } from "@/lib/utils";
 import {
   CircleDashed,
@@ -14,7 +16,6 @@ import {
   ListTodo,
   Square,
   SquareCheck,
-  SquareX,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { statusColorsConfig } from "./status";
@@ -25,10 +26,9 @@ import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
 
 const todoStatusConfig = {
-  PENDING: { icon: Square, className: "text-muted-foreground" },
-  IN_PROGRESS: { icon: CircleDashed, className: "" },
-  COMPLETED: { icon: SquareCheck, className: "" },
-  CANCELLED: { icon: SquareX, className: "text-destructive" },
+  pending: { icon: Square, className: "text-muted-foreground" },
+  in_progress: { icon: CircleDashed, className: "" },
+  completed: { icon: SquareCheck, className: "" },
 };
 
 // Intermediate tree node structure for building the tree
@@ -85,11 +85,15 @@ function createFileTree(filePaths: string[]): FileNode[] {
 }
 
 export function SidebarAgentView({ taskId }: { taskId: string }) {
-  const { task, todos, fileChanges, diffStats } = useTask(taskId);
+  const { task, fileChanges, diffStats } = useTask(taskId);
+  const { entries } = useSessionEntries(taskId);
   const { updateSelectedFilePath, openAgentEnvironment } = useAgentEnvironment();
 
+  // Derive todos from session entries (JSONL data)
+  const todos = useMemo(() => extractTodosFromEntries(entries), [entries]);
+
   const completedTodos = useMemo(
-    () => todos.filter((todo) => todo.status === "COMPLETED").length,
+    () => todos.filter((todo) => todo.status === "completed").length,
     [todos]
   );
 
@@ -175,7 +179,7 @@ export function SidebarAgentView({ taskId }: { taskId: string }) {
         </SidebarGroupContent>
       </SidebarGroup>
 
-      {/* Task List (Todos) */}
+      {/* Task List (Todos) - derived from session entries */}
       {todos.length > 0 && (
         <SidebarGroup>
           <SidebarGroupLabel className="hover:text-muted-foreground select-none gap-1.5">
@@ -189,32 +193,27 @@ export function SidebarAgentView({ taskId }: { taskId: string }) {
             </Badge>
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            {todos
-              .sort((a, b) => a.sequence - b.sequence)
-              .map((todo) => {
-                const TodoIcon =
-                  todoStatusConfig[todo.status as keyof typeof todoStatusConfig]
-                    .icon;
-                const iconClass =
-                  todoStatusConfig[todo.status as keyof typeof todoStatusConfig]
-                    .className;
-                return (
-                  <SidebarMenuItem key={todo.id}>
-                    <div
-                      className={cn(
-                        "flex min-h-8 items-start gap-2 p-2 pb-0 text-sm",
-                        todo.status === "COMPLETED" &&
-                          "text-muted-foreground line-through"
-                      )}
-                    >
-                      <TodoIcon className={cn("size-4", iconClass)} />
-                      <span className="line-clamp-2 flex-1 leading-4">
-                        {todo.content}
-                      </span>
-                    </div>
-                  </SidebarMenuItem>
-                );
-              })}
+            {todos.map((todo, index) => {
+              const config = todoStatusConfig[todo.status];
+              const TodoIcon = config?.icon ?? Square;
+              const iconClass = config?.className ?? "";
+              return (
+                <SidebarMenuItem key={index}>
+                  <div
+                    className={cn(
+                      "flex min-h-8 items-start gap-2 p-2 pb-0 text-sm",
+                      todo.status === "completed" &&
+                        "text-muted-foreground line-through"
+                    )}
+                  >
+                    <TodoIcon className={cn("size-4", iconClass)} />
+                    <span className="line-clamp-2 flex-1 leading-4">
+                      {todo.content}
+                    </span>
+                  </div>
+                </SidebarMenuItem>
+              );
+            })}
           </SidebarGroupContent>
         </SidebarGroup>
       )}

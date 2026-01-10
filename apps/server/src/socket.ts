@@ -3,7 +3,6 @@ import {
   StreamChunk,
   ServerToClientEvents,
   ClientToServerEvents,
-  TerminalEntry,
   ModelType,
   ApiKeys,
 } from "@repo/types";
@@ -46,26 +45,6 @@ function getOrCreateTaskStreamState(taskId: string): TaskStreamState {
 function cleanupTaskStreamState(taskId: string): void {
   taskStreamStates.delete(taskId);
   console.log(`[SOCKET] Cleaned up stream state for task ${taskId}`);
-}
-
-async function getTerminalHistory(_taskId: string): Promise<TerminalEntry[]> {
-  // Terminal history is streamed via session events
-  return [];
-}
-
-async function clearTerminal(_taskId: string): Promise<void> {
-  // Terminal clearing is handled client-side for Moru mode
-  // No server-side action needed
-}
-
-// Terminal updates are streamed via session events
-// These functions are kept as no-ops for compatibility
-function startTerminalPolling(_taskId: string) {
-  // No-op: Terminal output is streamed via session events
-}
-
-function stopTerminalPolling(_taskId: string) {
-  // No-op: Terminal output is streamed via session events
 }
 
 async function verifyTaskAccess(
@@ -307,7 +286,6 @@ export function createSocketServer(
         );
 
         await updateTaskStatus(data.taskId, "RUNNING", "SOCKET");
-        startTerminalPolling(data.taskId);
 
         // Validate that user has the required API key for the selected model
         if (!modelContext.validateAccess()) {
@@ -405,47 +383,6 @@ export function createSocketServer(
       } catch (error) {
         console.error("Error stopping stream:", error);
         socket.emit("stream-error", { error: "Failed to stop stream" });
-      }
-    });
-
-    socket.on("get-terminal-history", async (data) => {
-      try {
-        const hasAccess = await verifyTaskAccess(connectionId, data.taskId);
-        if (!hasAccess) {
-          socket.emit("terminal-history-error", {
-            error: "Access denied to task",
-          });
-          return;
-        }
-
-        const history = await getTerminalHistory(data.taskId);
-        socket.emit("terminal-history", {
-          taskId: data.taskId,
-          entries: history,
-        });
-      } catch (error) {
-        console.error("Error getting terminal history:", error);
-        socket.emit("terminal-history-error", {
-          error: "Failed to get terminal history",
-        });
-      }
-    });
-
-    socket.on("clear-terminal", async (data) => {
-      try {
-        const hasAccess = await verifyTaskAccess(connectionId, data.taskId);
-        if (!hasAccess) {
-          socket.emit("terminal-error", { error: "Access denied to task" });
-          return;
-        }
-
-        await clearTerminal(data.taskId);
-        emitToTask(data.taskId, "terminal-cleared", { taskId: data.taskId });
-      } catch (error) {
-        console.error("Error clearing terminal:", error);
-        socket.emit("terminal-error", {
-          error: "Failed to clear terminal",
-        });
       }
     });
 
@@ -606,12 +543,6 @@ export function emitStreamChunk(chunk: StreamChunk, taskId: string) {
   }
 }
 
-export function emitTerminalOutput(taskId: string, entry: TerminalEntry) {
-  if (io) {
-    emitToTask(taskId, "terminal-output", { taskId, entry });
-  }
-}
-
 export function emitSessionEntry(taskId: string, entry: unknown) {
   if (io) {
     emitToTask(taskId, "session-entry", { taskId, entry });
@@ -620,6 +551,3 @@ export function emitSessionEntry(taskId: string, entry: unknown) {
 
 // Export cleanup functions for task memory management
 export { cleanupTaskStreamState };
-
-// Also export terminal polling cleanup (already exists)
-export { stopTerminalPolling };

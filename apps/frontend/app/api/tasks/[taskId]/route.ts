@@ -13,14 +13,15 @@ export async function GET(
     const { error, user: _user } = await verifyTaskOwnership(taskId);
     if (error) return error;
 
-    const { task, todos, fileChanges, diffStats } =
+    const { task, fileChanges, diffStats } =
       await getTaskWithDetails(taskId);
 
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ task, todos, fileChanges, diffStats });
+    // Note: Todos are now derived from session entries on the client
+    return NextResponse.json({ task, fileChanges, diffStats });
   } catch (error) {
     console.error("Error fetching task:", error);
     return NextResponse.json(

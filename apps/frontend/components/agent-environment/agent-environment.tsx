@@ -1,30 +1,20 @@
 "use client";
 
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
-import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useState, memo, useCallback } from "react";
 import { Editor } from "./editor";
 import { FileExplorer } from "./file-explorer";
 import { Button } from "../ui/button";
-import { AlertTriangle, TerminalSquare, X } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { useFileTree } from "@/hooks/agent-environment/use-file-tree";
 import { useAgentEnvironment } from "./agent-environment-context";
 import { LogoHover } from "../graphics/logo/logo-hover";
 import { LeftPanelIcon } from "../graphics/icons/left-panel-icon";
 import { LeftPanelOpenIcon } from "../graphics/icons/left-panel-open-icon";
-import { BottomPanelOpenIcon } from "../graphics/icons/bottom-panel-open-icon";
-import { BottomPanelIcon } from "../graphics/icons/bottom-panel-icon";
 import { Close as SheetPrimitiveClose } from "@radix-ui/react-dialog";
 import { useTaskStatus } from "@/hooks/tasks/use-task-status";
 import { SheetTitle } from "../ui/sheet";
-
-const Terminal = dynamic(() => import("./terminal"), { ssr: false });
 
 function AgentEnvironment({
   isSheetOverlay = false,
@@ -32,7 +22,6 @@ function AgentEnvironment({
   isSheetOverlay?: boolean;
 }) {
   const [isExplorerCollapsed, setIsExplorerCollapsed] = useState(false);
-  const [isTerminalCollapsed, setIsTerminalCollapsed] = useState(true);
 
   const { taskId } = useParams<{ taskId: string }>();
 
@@ -44,7 +33,6 @@ function AgentEnvironment({
     updateSelectedFilePath,
     isLoadingContent,
     contentError,
-    triggerTerminalResize,
     shouldUseSheet,
   } = useAgentEnvironment();
 
@@ -127,25 +115,6 @@ function AgentEnvironment({
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hover:bg-sidebar-accent size-7 cursor-pointer"
-                onClick={() => setIsTerminalCollapsed((prev) => !prev)}
-              >
-                {isTerminalCollapsed ? (
-                  <BottomPanelIcon className="size-4" />
-                ) : (
-                  <BottomPanelOpenIcon className="size-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" align="end">
-              {isTerminalCollapsed ? "Open" : "Close"} Terminal
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
               {isSheetOverlay ? (
                 <SheetPrimitiveClose asChild>
                   <Button
@@ -185,40 +154,12 @@ function AgentEnvironment({
           isLoading={isTreeLoading}
         />
         <div className="flex-1 overflow-hidden">
-          <ResizablePanelGroup
-            direction="vertical"
-            className="h-full"
-            onLayout={triggerTerminalResize}
-          >
-            <ResizablePanel minSize={30} defaultSize={100}>
-              <Editor
-                selectedFilePath={selectedFilePath}
-                selectedFileContent={selectedFileWithContent?.content || ""}
-                isLoadingContent={isLoadingContent}
-                contentError={contentError}
-              />
-            </ResizablePanel>
-            {isTerminalCollapsed ? (
-              <button
-                onClick={() => setIsTerminalCollapsed(false)}
-                className="text-muted-foreground hover:text-foreground hover:bg-card hover:border-t-sidebar-border flex h-9 w-full cursor-n-resize items-center justify-start gap-2 border-t px-2 text-sm transition-all"
-              >
-                <TerminalSquare className="size-4 opacity-70" />
-                Terminal
-              </button>
-            ) : (
-              <>
-                <ResizableHandle className="bg-sidebar-border" />
-                <ResizablePanel minSize={20} defaultSize={0}>
-                  <div className="bg-background flex h-full flex-col">
-                    <Terminal
-                      handleCollapse={() => setIsTerminalCollapsed(true)}
-                    />
-                  </div>
-                </ResizablePanel>
-              </>
-            )}
-          </ResizablePanelGroup>
+          <Editor
+            selectedFilePath={selectedFilePath}
+            selectedFileContent={selectedFileWithContent?.content || ""}
+            isLoadingContent={isLoadingContent}
+            contentError={contentError}
+          />
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import type { Task, Todo } from "@repo/db";
+import type { Task } from "@repo/db";
 import { db } from "@repo/db";
 import { makeBackendRequest } from "../make-backend-request";
 
@@ -16,9 +16,9 @@ export interface DiffStats {
   totalFiles: number;
 }
 
+// Note: Todos are now derived from session entries (JSONL), not stored in DB
 export interface TaskWithDetails {
   task: Task | null;
-  todos: Todo[];
   fileChanges: FileChange[];
   diffStats: DiffStats;
 }
@@ -58,21 +58,17 @@ export async function getTaskWithDetails(
   taskId: string
 ): Promise<TaskWithDetails> {
   try {
-    // Fetch all data in parallel for better performance
-    const [task, todos, { fileChanges, diffStats }] = await Promise.all([
+    // Fetch task and file changes in parallel
+    // Note: Todos are now derived from session entries, not fetched from DB
+    const [task, { fileChanges, diffStats }] = await Promise.all([
       db.task.findUnique({
         where: { id: taskId },
-      }),
-      db.todo.findMany({
-        where: { taskId },
-        orderBy: { sequence: "asc" },
       }),
       fetchFileChanges(taskId),
     ]);
 
     return {
       task,
-      todos,
       fileChanges,
       diffStats,
     };
@@ -81,7 +77,6 @@ export async function getTaskWithDetails(
     // Return empty data structure on error
     return {
       task: null,
-      todos: [],
       fileChanges: [],
       diffStats: { additions: 0, deletions: 0, totalFiles: 0 },
     };

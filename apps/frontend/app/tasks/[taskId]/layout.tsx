@@ -24,7 +24,8 @@ export default async function TaskLayout({
 
   const user = await getUser();
 
-  const [initialTasks, { task, todos, fileChanges, diffStats }, taskMessages] =
+  // Note: Todos are now derived from session entries on the client
+  const [initialTasks, { task, fileChanges, diffStats }, taskMessages] =
     await Promise.all([
       user ? getTasks(user.id) : [],
       getTaskWithDetails(taskId),
@@ -42,7 +43,6 @@ export default async function TaskLayout({
       queryKey: ["task", taskId],
       queryFn: () => ({
         task,
-        todos,
         fileChanges,
         diffStats,
       }),

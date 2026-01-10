@@ -10,11 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ModelType, ClaudeCode } from '@repo/types';
 import { useTask } from '@/hooks/tasks/use-task';
 import { useSendMessage } from '@/hooks/chat/use-send-message';
-import {
-  CCMessages,
-  CCTodoPanel,
-  extractTodosFromEntries,
-} from '@/components/claude-code';
+import { CCMessages } from '@/components/claude-code';
 import InitializingAnimation from './initializing-animation';
 
 /**
@@ -80,9 +76,6 @@ function CCTaskPageContent() {
 
   // Combined streaming state
   const isStreaming = isSessionStreaming || isSocketStreaming;
-
-  // Extract todos from session entries
-  const todos = useMemo(() => extractTodosFromEntries(entries), [entries]);
 
   // Check if we have any displayable content
   const hasContent = entries.length > 0;
@@ -158,13 +151,6 @@ function CCTaskPageContent() {
           </div>
         )}
       </div>
-
-      {/* Todo Panel - sticky at bottom of content */}
-      {todos.length > 0 && (
-        <div className='sticky bottom-24 z-10 w-full'>
-          <CCTodoPanel todos={todos} className='rounded-lg border shadow-sm' />
-        </div>
-      )}
 
       {task?.status !== 'ARCHIVED' && (
         <>

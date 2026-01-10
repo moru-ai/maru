@@ -55,10 +55,9 @@ export default function TaskPage() {
   Resizable panel state
   */
 
-  const { 
-    rightPanelRef, 
-    lastPanelSizeRef, 
-    triggerTerminalResize,
+  const {
+    rightPanelRef,
+    lastPanelSizeRef,
     isSheetOpen,
     setIsSheetOpen,
     shouldUseSheet,
@@ -67,8 +66,6 @@ export default function TaskPage() {
   const resizablePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
 
   const handleLayout = useCallback(() => {
-    triggerTerminalResize();
-
     if (rightPanelRef.current) {
       if (rightPanelRef.current.isCollapsed() && isAgentEnvironmentOpen) {
         setIsAgentEnvironmentOpen(false);
@@ -79,7 +76,7 @@ export default function TaskPage() {
         setIsAgentEnvironmentOpen(true);
       }
     }
-  }, [triggerTerminalResize, rightPanelRef, isAgentEnvironmentOpen]);
+  }, [rightPanelRef, isAgentEnvironmentOpen]);
 
   /* 
   Keyboard shortcuts

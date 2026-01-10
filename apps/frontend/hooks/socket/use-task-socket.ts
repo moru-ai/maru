@@ -20,7 +20,7 @@ import type {
 import { TextPart, ToolResultPart } from "ai";
 import type { TaskWithDetails } from "@/lib/db-operations/get-task-with-details";
 import { FileTreeResponse } from "../agent-environment/use-file-tree";
-import { Task, TodoStatus } from "@repo/db";
+import { Task } from "@repo/db";
 import { TaskStatusData } from "@/lib/db-operations/get-task-status";
 
 interface FileChange {
@@ -764,71 +764,7 @@ export function useTaskSocket(taskId: string | undefined) {
           }
           break;
 
-        case "todo-update":
-          if (chunk.todoUpdate) {
-            const todos = chunk.todoUpdate.todos;
-            const action = chunk.todoUpdate.action;
-
-            queryClient.setQueryData(
-              ["task", taskId],
-              (oldData: TaskWithDetails) => {
-                if (!oldData) return oldData;
-
-                if (action === "replaced") {
-                  // Replace entire todo list with incoming todos
-                  const newTodos = todos.map((incomingTodo) => ({
-                    ...incomingTodo,
-                    status: incomingTodo.status.toUpperCase() as TodoStatus,
-                    taskId: taskId!,
-                    sequence: incomingTodo.sequence,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                  }));
-
-                  return {
-                    ...oldData,
-                    todos: newTodos.sort((a, b) => a.sequence - b.sequence),
-                  };
-                } else {
-                  // Merge/update existing todos (default behavior)
-                  const existingTodosMap = new Map(
-                    (oldData.todos || []).map((todo) => [todo.id, todo])
-                  );
-
-                  todos.forEach((incomingTodo) => {
-                    const existingTodo = existingTodosMap.get(incomingTodo.id);
-
-                    if (existingTodo) {
-                      existingTodosMap.set(incomingTodo.id, {
-                        ...existingTodo,
-                        ...incomingTodo,
-                        status: incomingTodo.status.toUpperCase() as TodoStatus,
-                        sequence: incomingTodo.sequence,
-                        updatedAt: new Date(),
-                      });
-                    } else {
-                      existingTodosMap.set(incomingTodo.id, {
-                        ...incomingTodo,
-                        status: incomingTodo.status.toUpperCase() as TodoStatus,
-                        taskId: taskId!,
-                        sequence: incomingTodo.sequence,
-                        createdAt: new Date(),
-                        updatedAt: new Date(),
-                      });
-                    }
-                  });
-
-                  return {
-                    ...oldData,
-                    todos: Array.from(existingTodosMap.values()).sort(
-                      (a, b) => a.sequence - b.sequence
-                    ),
-                  };
-                }
-              }
-            );
-          }
-          break;
+        // Note: todo-update case removed - todos are now derived from session entries
       }
     }
 

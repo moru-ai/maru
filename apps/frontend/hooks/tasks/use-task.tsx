@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 export function useTask(taskId: string) {
   // Main task data query (includes fileChanges now)
+  // Note: Todos are now derived from session entries, not from DB
   const taskQuery = useQuery({
     queryKey: ["task", taskId],
     queryFn: async (): Promise<TaskWithDetails> => {
@@ -15,7 +16,6 @@ export function useTask(taskId: string) {
 
   return {
     task: taskQuery.data?.task || null,
-    todos: taskQuery.data?.todos || [],
     fileChanges: taskQuery.data?.fileChanges || [],
     diffStats: taskQuery.data?.diffStats || {
       additions: 0,

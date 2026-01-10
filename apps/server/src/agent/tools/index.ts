@@ -14,8 +14,7 @@ import {
   DeleteFileParamsSchema,
 } from "@repo/types";
 import { createToolExecutor } from "../../execution";
-import { emitTerminalOutput, emitStreamChunk } from "../../socket";
-import type { TerminalEntry } from "@repo/types";
+import { emitStreamChunk } from "../../socket";
 import { MCPManager } from "../mcp/mcp-manager";
 import {
   transformMCPToolName,
@@ -92,39 +91,6 @@ function createMCPToolWrapper(
  */
 export function getMCPManager(taskId: string): MCPManager | null {
   return activeMCPManagers.get(taskId) || null;
-}
-
-// Terminal entry counters for unique IDs per task
-const taskTerminalCounters = new Map<string, number>();
-
-// Helper function to get next terminal entry ID for a task
-function getNextTerminalEntryId(taskId: string): number {
-  const currentId = taskTerminalCounters.get(taskId) || 0;
-  const nextId = currentId + 1;
-  taskTerminalCounters.set(taskId, nextId);
-  return nextId;
-}
-
-// Helper function to create and emit terminal entries
-function createAndEmitTerminalEntry(
-  taskId: string,
-  type: TerminalEntry["type"],
-  data: string,
-  processId?: number
-): void {
-  const entry: TerminalEntry = {
-    id: getNextTerminalEntryId(taskId),
-    timestamp: Date.now(),
-    data,
-    type,
-    processId,
-  };
-
-  console.log(
-    `[TERMINAL_OUTPUT] Emitting ${type} for task ${taskId}:`,
-    data.slice(0, 100)
-  );
-  emitTerminalOutput(taskId, entry);
 }
 
 // Helper function to read tool descriptions from markdown files
@@ -317,22 +283,9 @@ export async function createTools(taskId: string, workspacePath?: string) {
       execute: async ({ command, is_background, explanation }) => {
         console.log(`[TERMINAL_CMD] ${explanation}`);
 
-        // Emit the command being executed to the terminal
-        createAndEmitTerminalEntry(taskId, "command", command);
-
         const result = await executor.executeCommand(command, {
           isBackground: is_background,
         });
-
-        // Emit stdout output if present
-        if (result.success && result.stdout) {
-          createAndEmitTerminalEntry(taskId, "stdout", result.stdout);
-        }
-
-        // Emit stderr output if present
-        if (result.stderr) {
-          createAndEmitTerminalEntry(taskId, "stderr", result.stderr);
-        }
 
         return result;
       },
@@ -512,14 +465,6 @@ export async function stopAllMCPManagers(): Promise<void> {
 
   await Promise.allSettled(stopPromises);
   activeMCPManagers.clear();
-}
-
-/**
- * Clean up terminal counter for a specific task
- */
-export function cleanupTaskTerminalCounters(taskId: string): void {
-  taskTerminalCounters.delete(taskId);
-  console.log(`[TOOLS] Cleaned up terminal counters for task ${taskId}`);
 }
 
 // Default tools export
