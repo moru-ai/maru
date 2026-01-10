@@ -190,8 +190,8 @@ export function SidebarAgentView({ taskId }: { taskId: string }) {
             </SidebarMenuItem>
           )}
 
-          {/* Task total diff */}
-          {(diffStats.additions > 0 || diffStats.deletions > 0) && (
+          {/* Task total diff - hidden for now */}
+          {/* {(diffStats.additions > 0 || diffStats.deletions > 0) && (
             <SidebarMenuItem>
               <div className="flex h-8 items-center gap-2 px-2 text-sm">
                 <FileDiff className="size-4" />
@@ -203,7 +203,7 @@ export function SidebarAgentView({ taskId }: { taskId: string }) {
                 </div>
               </div>
             </SidebarMenuItem>
-          )}
+          )} */}
         </SidebarGroupContent>
       </SidebarGroup>
 
