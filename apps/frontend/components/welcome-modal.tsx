@@ -10,9 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useModal } from "@/components/layout/modal-context";
 import { LogoBurst } from "./graphics/logo/logo-burst";
 import { Check } from "lucide-react";
-import { useGitHubStatus } from "@/hooks/github/use-github-status";
 import { useApiKeys, useApiKeyValidation } from "@/hooks/api-keys/use-api-keys";
-import Link from "next/link";
 
 export const shouldShowWelcomeModal = () => {
   return (
@@ -31,20 +29,13 @@ export function WelcomeModal({
 }) {
   const { openSettingsModal } = useModal();
 
-  // In development or non-production, bypass certain requirements (e.g., setup tasks)
+  // In development or non-production, bypass certain requirements
   const isLocal = shouldShowWelcomeModal();
 
-  const handleConnectGitHub = () => {
-    // onOpenChange(false);
-    openSettingsModal("github");
-  };
-
   const handleSetupAPIKeys = () => {
-    // onOpenChange(false);
     openSettingsModal("models");
   };
 
-  const { data: githubStatus } = useGitHubStatus();
   const { data: apiKeys } = useApiKeys();
   const { data: validationState } = useApiKeyValidation();
 
@@ -59,9 +50,8 @@ export function WelcomeModal({
       return key && key.length > 0 && validation?.isValid;
     });
 
-  // Check if both setup tasks are complete
-  const canGetStarted =
-    isLocal || (hasValidApiKey && githubStatus?.isAppInstalled);
+  // Check if setup is complete (just need valid API key)
+  const canGetStarted = isLocal || hasValidApiKey;
 
   return (
     <Dialog open={open} onOpenChange={canGetStarted ? onOpenChange : undefined}>
@@ -73,37 +63,13 @@ export function WelcomeModal({
 
         <div className="flex flex-col gap-4">
           <p className="text-muted-foreground text-sm">
-            Welcome to Shadow! Complete the following steps to get started. This
+            Welcome to Shadow! Add your API keys to get started. This
             configuration can always be changed later in Settings.
           </p>
 
           <div className="mt-3 flex items-start gap-3">
             <div className="bg-primary text-primary-foreground mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-medium">
               1
-            </div>
-            <div className="flex flex-col items-start gap-0.5">
-              <div className="flex items-center gap-2">
-                <p className="font-medium">Connect the Shadow GitHub App</p>
-                {githubStatus?.isAppInstalled && (
-                  <Check className="size-4 text-green-400" />
-                )}
-              </div>
-              <p className="text-muted-foreground pb-2 text-sm">
-                Gives Shadow access to work on your existing repositories.
-              </p>
-              <Button
-                disabled={githubStatus?.isAppInstalled}
-                variant="secondary"
-                onClick={handleConnectGitHub}
-              >
-                Connect GitHub
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <div className="bg-primary text-primary-foreground mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-medium">
-              2
             </div>
             <div className="flex flex-col items-start gap-0.5">
               <div className="flex items-center gap-2">
