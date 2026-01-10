@@ -48,11 +48,10 @@ function AgentEnvironment({
     shouldUseSheet,
   } = useAgentEnvironment();
 
-  const { data: treeData, error: treeError } = useFileTree(taskId);
+  const { data: treeData, error: treeError } = useFileTree(taskId, { polling: true });
   const { data } = useTaskStatus(taskId);
-  const { status, initStatus } = data || {};
+  const { status } = data || {};
   const isLoading = status === "INITIALIZING";
-  const isWorkspaceInactive = initStatus === "INACTIVE";
 
   const handleClose = useCallback(() => {
     if (rightPanelRef.current) {
@@ -67,18 +66,7 @@ function AgentEnvironment({
       <EmptyStateWrapper onClose={handleClose} isSheetOverlay={isSheetOverlay}>
         <div className="font-departureMono flex items-center gap-4 text-xl font-medium tracking-tighter">
           <LogoHover forceAnimate />
-          Initializing Shadow Realm...
-        </div>
-      </EmptyStateWrapper>
-    );
-  }
-
-  if (isWorkspaceInactive) {
-    return (
-      <EmptyStateWrapper onClose={handleClose} isSheetOverlay={isSheetOverlay}>
-        <div className="font-departureMono flex items-center gap-4 text-xl font-medium tracking-tighter">
-          <LogoHover />
-          Workspace Inactive.
+          Initializing Maru Workspace...
         </div>
       </EmptyStateWrapper>
     );
@@ -110,11 +98,11 @@ function AgentEnvironment({
       <div className="border-border bg-card h-13 flex shrink-0 items-center justify-between border-b px-2">
         {shouldUseSheet ? (
           <SheetTitle className="font-departureMono font-normal tracking-tight">
-            Shadow Realm
+            Maru Workspace
           </SheetTitle>
         ) : (
           <div className="font-departureMono font-normal tracking-tight">
-            Shadow Realm
+            Maru Workspace
           </div>
         )}
         <div className="flex items-center gap-0.5">
@@ -181,7 +169,7 @@ function AgentEnvironment({
               )}
             </TooltipTrigger>
             <TooltipContent side="bottom" align="end">
-              Close Shadow Realm
+              Close Maru Workspace
             </TooltipContent>
           </Tooltip>
         </div>
@@ -272,7 +260,7 @@ function EmptyStateWrapper({
           )}
         </TooltipTrigger>
         <TooltipContent side="bottom" align="end">
-          Close Shadow Realm
+          Close Maru Workspace
         </TooltipContent>
       </Tooltip>
       {children}

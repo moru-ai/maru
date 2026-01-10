@@ -1,12 +1,10 @@
 import { Router } from "express";
 import { prisma } from "@repo/db";
-import { FILE_SIZE_LIMITS } from "@repo/types";
-import { createWorkspaceManager } from "../execution";
-import { buildFileTree } from "./build-tree";
+import { createSandboxStorage, isSandboxStorageConfigured } from "../services/storage";
 
 const router = Router();
 
-// Get file tree for a task workspace
+// Get file tree for a task workspace (from storage)
 router.get("/:taskId/files/tree", async (req, res) => {
   try {
     const { taskId } = req.params;
@@ -15,8 +13,7 @@ router.get("/:taskId/files/tree", async (req, res) => {
       where: { id: taskId },
       select: {
         id: true,
-        status: true,
-        workspacePath: true,
+        workspaceArchiveId: true,
       },
     });
 
@@ -27,21 +24,20 @@ router.get("/:taskId/files/tree", async (req, res) => {
       });
     }
 
-    if (!task.workspacePath || task.status === "INITIALIZING") {
+    // Serve from storage
+    if (task.workspaceArchiveId && isSandboxStorageConfigured()) {
+      const storage = createSandboxStorage();
+      const tree = await storage.getFileTree(task.workspaceArchiveId, "/workspace");
       return res.json({
         success: true,
-        tree: [],
+        tree: tree ?? [],
       });
     }
 
-    const workspaceManager = createWorkspaceManager();
-    const executor = await workspaceManager.getExecutor(taskId);
-
-    const tree = await buildFileTree(executor);
-
+    // No workspace saved yet
     res.json({
       success: true,
-      tree,
+      tree: [],
     });
   } catch (error) {
     console.error("[FILE_TREE_API_ERROR]", error);
@@ -52,7 +48,7 @@ router.get("/:taskId/files/tree", async (req, res) => {
   }
 });
 
-// Get file content for a task workspace
+// Get file content for a task workspace (from storage)
 router.get("/:taskId/files/content", async (req, res) => {
   try {
     const { taskId } = req.params;
@@ -65,13 +61,11 @@ router.get("/:taskId/files/content", async (req, res) => {
       });
     }
 
-    // Verify task exists
     const task = await prisma.task.findUnique({
       where: { id: taskId },
       select: {
         id: true,
-        status: true,
-        workspacePath: true,
+        workspaceArchiveId: true,
       },
     });
 
@@ -82,66 +76,24 @@ router.get("/:taskId/files/content", async (req, res) => {
       });
     }
 
-    // Check if workspace is ready
-    if (!task.workspacePath || task.status === "INITIALIZING") {
-      return res.status(400).json({
-        success: false,
-        error: "Workspace is still initializing",
-      });
+    // Serve from storage
+    if (task.workspaceArchiveId && isSandboxStorageConfigured()) {
+      const storage = createSandboxStorage();
+      const content = await storage.getFileContent(task.workspaceArchiveId, filePath);
+
+      if (content !== null) {
+        return res.json({
+          success: true,
+          content,
+          path: filePath,
+        });
+      }
     }
 
-    // Convert path: remove leading slash and handle relative paths
-    const targetPath = filePath.startsWith("/") ? filePath.slice(1) : filePath;
-
-    // 1. Get file stats and check size
-    const workspaceManager = createWorkspaceManager();
-    const executor = await workspaceManager.getExecutor(taskId);
-    const statsResult = await executor.getFileStats(targetPath);
-
-    if (!statsResult.success) {
-      // Check if it's a file not found error (ENOENT)
-      const isFileNotFound =
-        statsResult.error?.includes("ENOENT") ||
-        statsResult.error?.includes("no such file or directory");
-
-      return res.status(isFileNotFound ? 404 : 400).json({
-        success: false,
-        error: statsResult.error || "Failed to get file stats",
-        errorType: isFileNotFound ? "FILE_NOT_FOUND" : "UNKNOWN",
-      });
-    }
-
-    if (!statsResult.stats?.isFile) {
-      return res.status(400).json({
-        success: false,
-        error: "Path is not a file",
-      });
-    }
-
-    // 2. Check size limit
-    if (statsResult.stats.size > FILE_SIZE_LIMITS.MAX_FILE_SIZE_BYTES) {
-      return res.status(400).json({
-        success: false,
-        error: `File too large: ${statsResult.stats.size} bytes (max: ${FILE_SIZE_LIMITS.MAX_FILE_SIZE_BYTES} bytes)`,
-      });
-    }
-
-    // 3. Read the file (any file type allowed)
-    const result = await executor.readFile(targetPath);
-
-    if (!result.success || !result.content) {
-      return res.status(400).json({
-        success: false,
-        error: result.error || "Failed to read file",
-      });
-    }
-
-    res.json({
-      success: true,
-      content: result.content,
-      path: filePath,
-      size: statsResult.stats.size,
-      truncated: false,
+    // File not found in storage
+    res.status(404).json({
+      success: false,
+      error: "File not found",
     });
   } catch (error) {
     console.error("[FILE_CONTENT_API_ERROR]", error);

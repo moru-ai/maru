@@ -66,6 +66,11 @@ export const sharedConfigSchema = z.object({
   MORU_API_KEY: z.string().optional(),
   MORU_TEMPLATE_ID: z.string().default("claude-agent"),
   MORU_SANDBOX_TIMEOUT_MS: z.coerce.number().default(3600000), // 1 hour
+
+  // GCS Storage configuration
+  GCS_BUCKET_NAME: z.string().optional(),
+  GCS_KEY_FILE: z.string().optional(),
+  GCS_CREDENTIALS_BASE64: z.string().optional(),
 });
 
 /**
@@ -112,6 +117,11 @@ export const createSharedConfig = (
   moruApiKey: data.MORU_API_KEY,
   moruTemplateId: data.MORU_TEMPLATE_ID,
   moruSandboxTimeoutMs: data.MORU_SANDBOX_TIMEOUT_MS,
+
+  // GCS Storage
+  gcsBucketName: data.GCS_BUCKET_NAME,
+  gcsKeyFile: data.GCS_KEY_FILE,
+  gcsCredentialsBase64: data.GCS_CREDENTIALS_BASE64,
 });
 
 export type SharedConfig = ReturnType<typeof createSharedConfig>;

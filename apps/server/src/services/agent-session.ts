@@ -2,6 +2,7 @@ import { Sandbox } from "@moru-ai/core";
 import { prisma } from "@repo/db";
 import { emitToTask, emitSessionEntry } from "../socket";
 import config from "../config";
+import { createSandboxStorage, isSandboxStorageConfigured } from "./storage";
 
 const active = new Map<string, { sandbox: Sandbox; pid: number; stop: () => void }>();
 
@@ -25,6 +26,12 @@ export async function sendMessage(
     throw new Error("Already processing a message");
   }
 
+  // Get existing task data for restoration
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { sessionId: true, workspaceArchiveId: true }
+  });
+
   // Create sandbox
   const sandbox = await Sandbox.create(config.moruTemplateId || "base", {
     apiKey: config.moruApiKey,
@@ -32,15 +39,25 @@ export async function sendMessage(
     metadata: { taskId, userId }
   });
 
-  // Restore if resuming
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
-    select: { sessionId: true }
-  });
+  // Restore workspace from storage if exists
+  if (task?.workspaceArchiveId && isSandboxStorageConfigured()) {
+    try {
+      const storage = createSandboxStorage();
+      const restoreResult = await storage.restore(task.workspaceArchiveId, sandbox);
+      if (restoreResult.success) {
+        console.log(`[AGENT_SESSION] Restored workspace: ${restoreResult.fileCount} files`);
+      } else {
+        console.warn(`[AGENT_SESSION] Failed to restore workspace: ${restoreResult.error}`);
+      }
+    } catch (error) {
+      console.warn(`[AGENT_SESSION] Workspace restore error:`, error);
+    }
+  }
 
   let sessionId = task?.sessionId;
   let linesRead = 0;
 
+  // Restore session JSONL if resuming
   if (sessionId) {
     linesRead = await restoreSession(taskId, sessionId, sandbox);
   }
@@ -92,10 +109,43 @@ export async function sendMessage(
       stopped = true;
       if (pollTimer) clearTimeout(pollTimer);
 
-      // Final read then done
+      // Final read, save workspace, kill sandbox
       (async () => {
         linesRead = await pollFile(taskId, userId, sessionId!, sandbox, linesRead);
-        emitToTask(taskId, "session-complete", { taskId, sessionId, result: msg.result });
+
+        // Save workspace to storage before killing sandbox
+        let workspaceSaved = false;
+        if (isSandboxStorageConfigured()) {
+          try {
+            const storage = createSandboxStorage();
+            const saveResult = await storage.save(taskId, userId, sandbox, {
+              paths: ["/workspace", "/home/user/.claude"]
+            });
+
+            if (saveResult.success) {
+              await prisma.task.update({
+                where: { id: taskId },
+                data: { workspaceArchiveId: saveResult.archiveId }
+              });
+              console.log(`[AGENT_SESSION] Saved workspace: ${saveResult.archiveId} (${saveResult.sizeBytes} bytes)`);
+              workspaceSaved = true;
+            } else {
+              console.warn(`[AGENT_SESSION] Failed to save workspace: ${saveResult.error}`);
+            }
+          } catch (error) {
+            console.warn(`[AGENT_SESSION] Workspace save error:`, error);
+          }
+        }
+
+        // Kill sandbox
+        try {
+          await sandbox.kill();
+          console.log(`[AGENT_SESSION] Killed sandbox for task ${taskId}`);
+        } catch (error) {
+          console.warn(`[AGENT_SESSION] Failed to kill sandbox:`, error);
+        }
+
+        emitToTask(taskId, "session-complete", { taskId, sessionId, result: msg.result, workspaceSaved });
         done();
       })();
     }

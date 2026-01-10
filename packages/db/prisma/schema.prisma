@@ -118,6 +118,9 @@ model Task {
 
   // Initial message for auto-processing via /initiate
   initialMessage String?
+
+  // Workspace storage archive ID for persistence
+  workspaceArchiveId String?
 }
 
 model Todo {

@@ -7,7 +7,7 @@ export interface FileTreeResponse {
   error?: string;
 }
 
-export function useFileTree(taskId: string) {
+export function useFileTree(taskId: string, options?: { polling?: boolean }) {
   return useQuery({
     queryKey: ["file-tree", taskId],
     queryFn: async (): Promise<FileTreeResponse> => {
@@ -18,5 +18,8 @@ export function useFileTree(taskId: string) {
       return res.json();
     },
     enabled: !!taskId,
+    staleTime: 0,
+    gcTime: 0,
+    refetchInterval: options?.polling ? 5000 : false,
   });
 }

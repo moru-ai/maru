@@ -47,20 +47,30 @@ function EditorComponent({
 
   const filePathHeader = useMemo(
     () => (
-      <div className="text-muted-foreground flex items-center gap-0.5 px-5 pb-1 pt-2 text-[13px]">
-        {selectedFilePath &&
-          selectedFilePath.split("/").map((part, index) => (
-            <Fragment key={index}>
-              {index > 1 && (
-                <span className="text-muted-foreground">
-                  <ChevronRight className="size-3" />
-                </span>
-              )}
-              <span className="text-muted-foreground leading-tight">
-                {part}
-              </span>
-            </Fragment>
-          ))}
+      <div className="text-muted-foreground flex items-center justify-between px-5 pb-1 pt-2 text-[13px]">
+        <div className="flex items-center gap-0.5">
+          {selectedFilePath &&
+            selectedFilePath
+              .split("/")
+              .filter((part) => part && part !== "workspace")
+              .map((part, index) => (
+                <Fragment key={index}>
+                  {index > 0 && (
+                    <span className="text-muted-foreground">
+                      <ChevronRight className="size-3" />
+                    </span>
+                  )}
+                  <span className="text-muted-foreground leading-tight">
+                    {part}
+                  </span>
+                </Fragment>
+              ))}
+        </div>
+        {selectedFilePath && (
+          <span className="bg-muted text-muted-foreground rounded px-2 py-0.5 text-xs">
+            Read-only
+          </span>
+        )}
       </div>
     ),
     [selectedFilePath]
