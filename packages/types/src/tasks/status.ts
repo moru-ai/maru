@@ -77,6 +77,12 @@ export function getStatusText(task: TaskWithInitFields): string {
     return "Initializing";
   }
 
+  // If task has a meaningful status (not just INITIALIZING), use that
+  // This handles cases where initStatus is INACTIVE but task has run
+  if (task.status && task.status !== "INITIALIZING") {
+    return task.status.toLowerCase().replace("_", " ");
+  }
+
   if (isInitializationNotStarted(task)) {
     return "Not started";
   }

@@ -3,6 +3,7 @@ import { prisma } from "@repo/db";
 import { emitToTask, emitSessionEntry } from "../socket";
 import config from "../config";
 import { createSandboxStorage, isSandboxStorageConfigured } from "./storage";
+import { updateTaskStatus } from "../utils/task-status";
 
 const active = new Map<string, { sandbox: Sandbox; pid: number; stop: () => void }>();
 
@@ -151,6 +152,9 @@ export async function sendMessage(
         } catch (error) {
           console.warn(`[AGENT_SESSION] Failed to kill sandbox:`, error);
         }
+
+        // Update task status to COMPLETED
+        await updateTaskStatus(taskId, "COMPLETED", "AGENT_SESSION");
 
         done();
       })();
