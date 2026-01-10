@@ -7,8 +7,8 @@ import { WelcomeModal } from "../../welcome-modal";
 import { useAuthSession } from "../../auth/session-provider";
 import type { ModelType } from "@repo/types";
 
-const WELCOME_MODAL_SHOWN_KEY = "shadow-welcome-modal-shown";
-const WELCOME_MODAL_COMPLETED_KEY = "shadow-welcome-modal-completed";
+const WELCOME_MODAL_SHOWN_KEY = "maru-welcome-modal-shown";
+const WELCOME_MODAL_COMPLETED_KEY = "maru-welcome-modal-completed";
 const WELCOME_MODAL_DELAY = 300;
 
 export function HomePageContent({
@@ -52,7 +52,7 @@ export function HomePageContent({
         <LogoHover size="lg" forceAnimate={isPending} />
         Code with{" "}
         <span className="text-muted-foreground inline-flex items-center gap-2">
-          Shadow
+          Maru
         </span>
       </div>
       <PromptForm

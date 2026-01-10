@@ -11,7 +11,7 @@ export const STEP_DISPLAY_NAMES: Record<InitStatus, string> = {
   VERIFY_VM_WORKSPACE: "Verifying Workspace",
   START_BACKGROUND_SERVICES: "Starting Background Services",
   INSTALL_DEPENDENCIES: "Installing Dependencies",
-  COMPLETE_SHADOW_WIKI: "Completing Setup", // Legacy name, kept for backward compatibility
+  COMPLETE_MARU_WIKI: "Completing Setup", // Legacy name, kept for backward compatibility
   ACTIVE: "Active",
   CREATE_SANDBOX: "Creating Sandbox",
   CLONE_REPOSITORY: "Cloning Repository",

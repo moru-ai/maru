@@ -99,7 +99,7 @@ model Task {
   userId                      String
   baseBranch                  String?
   baseCommitSha               String?
-  shadowBranch                String?
+  maruBranch                  String?
   pullRequestNumber           Int?
   githubIssueId               String?
   messages                    ChatMessage[] @relation("TaskMessages")
@@ -272,7 +272,7 @@ enum InitStatus {
   VERIFY_VM_WORKSPACE
   START_BACKGROUND_SERVICES
   INSTALL_DEPENDENCIES
-  COMPLETE_SHADOW_WIKI
+  COMPLETE_MARU_WIKI
   ACTIVE
   // Moru sandbox mode steps
   CREATE_SANDBOX

@@ -119,7 +119,7 @@ function AnimationHeader() {
 
   return (
     <div className="text-muted-foreground text-[13px]">
-      Initializing Shadow
+      Initializing Maru
       {Array.from({ length: dots }).map((_, i) => (
         <span key={i}>.</span>
       ))}

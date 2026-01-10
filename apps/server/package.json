@@ -10,8 +10,8 @@
     "lint": "eslint 'src/**/*.ts'",
     "check-types": "tsc --noEmit",
     "format": "prettier --write 'src/**/*.ts'",
-    "docker:build": "docker build -f Dockerfile -t shadow-server ../../",
-    "docker:run": "docker run -p 4000:4000 --env-file .env shadow-server"
+    "docker:build": "docker build -f Dockerfile -t maru-server ../../",
+    "docker:run": "docker run -p 4000:4000 --env-file .env maru-server"
   },
   "author": "",
   "license": "ISC",

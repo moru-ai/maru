@@ -10,7 +10,7 @@ const MCP_SERVERS: MCPServerConfig[] = [
     enabled: process.env.MCP_CONTEXT7_ENABLED !== "false", // Default to enabled
     timeout: 30000, // 30 second timeout
     headers: {
-      "User-Agent": "Shadow-Agent/1.0",
+      "User-Agent": "Maru-Agent/1.0",
     },
   },
 ];

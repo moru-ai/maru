@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "maru-agent"
 version = "0.1.0"
-description = "Shadow coding agent using Claude Agent SDK"
+description = "Maru coding agent using Claude Agent SDK"
 authors = ["Moru <team@moru.io>"]
 package-mode = false
 

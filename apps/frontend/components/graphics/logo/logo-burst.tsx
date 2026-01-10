@@ -3,8 +3,8 @@
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import "./logo-animation.css";
-import { ShadowLogoSvg } from "./logo-svg";
-import { ShadowLogoBurstSvg } from "./logo-burst-svg";
+import { MaruLogoSvg } from "./logo-svg";
+import { MaruLogoBurstSvg } from "./logo-burst-svg";
 
 const sizes = {
   sm: {
@@ -62,9 +62,9 @@ export function LogoBurst({
         }}
       >
         {shouldAnimate ? (
-          <ShadowLogoBurstSvg className={sizes[size].className} />
+          <MaruLogoBurstSvg className={sizes[size].className} />
         ) : (
-          <ShadowLogoSvg className={sizes[size].className} />
+          <MaruLogoSvg className={sizes[size].className} />
         )}
       </div>
     </div>

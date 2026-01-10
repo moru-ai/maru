@@ -48,7 +48,7 @@ ask_required() {
 }
 
 main() {
-    echo -e "${GREEN}Shadow Environment Setup${NC}"
+    echo -e "${GREEN}Maru Environment Setup${NC}"
     echo "============================"
     echo
     echo "This script will help you set up your environment variables."
@@ -63,7 +63,7 @@ main() {
     # Database Configuration
     echo -e "\n${GREEN}Database Configuration${NC}"
     echo "****************************************************"
-    DATABASE_URL=$(ask "Database URL" "postgres://postgres:@127.0.0.1:5432/shadow_dev")
+    DATABASE_URL=$(ask "Database URL" "postgres://postgres:@127.0.0.1:5432/maru_dev")
 
 
     # Pinecone Configuration
@@ -72,7 +72,7 @@ main() {
     echo "Get your API key from: https://app.pinecone.io/"
     echo "Warning: If not provided, you will not be able to use indexing."
     PINECONE_API_KEY=$(ask "Pinecone API Key")
-    PINECONE_INDEX_NAME=$(ask "Pinecone Index Name" "shadow")
+    PINECONE_INDEX_NAME=$(ask "Pinecone Index Name" "maru")
 
     # GitHub Credentials
     echo -e "\n${GREEN}GitHub Credentials${NC}"
@@ -98,7 +98,7 @@ main() {
     echo -e "\n${GREEN}Local Development${NC}"
     echo "****************************************************"
     echo "Directory where local agent workspaces will be created:"
-    WORKSPACE_DIR=$(ask "Workspace Directory (absolute path)" "$(pwd)/shadow-worktree")
+    WORKSPACE_DIR=$(ask "Workspace Directory (absolute path)" "$(pwd)/maru-worktree")
 
     # Server Configuration
     echo -e "\n${GREEN}Server Configuration${NC}"
@@ -179,7 +179,7 @@ trap 'echo -e "\n\nSetup cancelled."; exit 130' INT
 
 if [ ! -f "apps/server/.env.template" ] || [ ! -f "apps/frontend/.env.template" ]; then
     echo -e "${RED}[!] Error: .env.template files not found.${NC}"
-    echo "Please run this script from the root of the Shadow project."
+    echo "Please run this script from the root of the Maru project."
     exit 1
 fi
 

@@ -234,7 +234,7 @@ export default function TaskPage() {
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="left" shortcut="⌘J">
-                        Toggle Shadow Realm
+                        Toggle Maru Realm
                       </TooltipContent>
                     </Tooltip>
                   </div>

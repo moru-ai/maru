@@ -60,8 +60,8 @@ export class ModelProvider {
             apiKey: userApiKeys.openrouter,
             // Add required headers for OpenRouter
             headers: {
-              "HTTP-Referer": "https://shadowrealm.ai",
-              "X-Title": "Shadow Agent",
+              "HTTP-Referer": "https://maru.moru.io",
+              "X-Title": "Maru Agent",
             },
           });
           const model = openrouterClient.chat(modelId);

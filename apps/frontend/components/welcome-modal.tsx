@@ -58,12 +58,12 @@ export function WelcomeModal({
       <DialogContent showCloseButton={false}>
         <DialogHeader className="items-center py-4">
           <LogoBurst size="lg" forceAnimate={canGetStarted} />
-          <DialogTitle className="sr-only">Welcome to Shadow</DialogTitle>
+          <DialogTitle className="sr-only">Welcome to Maru</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
           <p className="text-muted-foreground text-sm">
-            Welcome to Shadow! Add your API keys to get started. This
+            Welcome to Maru! Add your API keys to get started. This
             configuration can always be changed later in Settings.
           </p>
 
@@ -77,7 +77,7 @@ export function WelcomeModal({
                 {hasValidApiKey && <Check className="size-4 text-green-400" />}
               </div>
               <p className="text-muted-foreground pb-2 text-sm">
-                Shadow is BYOK; enter your own API keys to use the models.
+                Maru is BYOK; enter your own API keys to use the models.
               </p>
               <Button variant="secondary" onClick={handleSetupAPIKeys}>
                 {hasValidApiKey ? "Manage API Keys" : "Setup API Keys"}
@@ -91,7 +91,7 @@ export function WelcomeModal({
                 <p className="text-muted-foreground text-[13px] leading-tight">
                   <strong>Important:</strong> While your data is stored
                   securely, we recommend not working on codebases requiring
-                  enterprise-grade security with Shadow. Your API keys are never
+                  enterprise-grade security with Maru. Your API keys are never
                   permanently stored remotely.{" "}
                   <a
                     href="https://docs.google.com/document/d/1_xpk3NP_HCgMvpwMo9W93RFD_PsiXhwrLGNtZnJesnA"

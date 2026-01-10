@@ -45,7 +45,7 @@ export const sharedConfigSchema = z.object({
 
   // Vector database (optional, currently unused)
   PINECONE_API_KEY: z.string().optional(),
-  PINECONE_INDEX_NAME: z.string().default("shadow"),
+  PINECONE_INDEX_NAME: z.string().default("maru"),
   EMBEDDING_MODEL: z.string().default("llama-text-embed-v2"),
   // Model and concurrency settings
   CONCURRENCY: z.coerce.number().default(4),

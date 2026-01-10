@@ -1,5 +1,5 @@
 {
-  "name": "shadow-monorepo",
+  "name": "maru-monorepo",
   "private": true,
   "scripts": {
     "build": "turbo run build",

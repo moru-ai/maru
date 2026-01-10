@@ -3,8 +3,8 @@
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import "./logo-animation.css";
-import { ShadowLogoSvg } from "./logo-svg";
-import { ShadowLogoHoverSvg } from "./logo-hover-svg";
+import { MaruLogoSvg } from "./logo-svg";
+import { MaruLogoHoverSvg } from "./logo-hover-svg";
 
 const sizes = {
   sm: {
@@ -62,9 +62,9 @@ export function LogoHover({
         }}
       >
         {shouldAnimate ? (
-          <ShadowLogoHoverSvg className={sizes[size].className} />
+          <MaruLogoHoverSvg className={sizes[size].className} />
         ) : (
-          <ShadowLogoSvg className={sizes[size].className} />
+          <MaruLogoSvg className={sizes[size].className} />
         )}
       </div>
     </div>

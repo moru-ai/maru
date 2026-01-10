@@ -36,10 +36,10 @@ __pycache__/
 *.pyc
 
 test-workspace/
-shadow-worktree/*
+maru-worktree/*
 
 # Indexing stuff (Rajan)
-.shadow/
+.maru/
 bun.lock
 
 internal/

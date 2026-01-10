@@ -1,4 +1,4 @@
-# Shadow ([Case Study](https://www.ishaand.com/shadow))
+# Maru ([Case Study](https://www.ishaand.com/maru))
 
 <img width="2880" height="1620" alt="cover" src="https://github.com/user-attachments/assets/69dfd5f8-0532-4515-a59e-9d43f2243ad8" />
 
@@ -7,7 +7,7 @@ An open-source background coding agent. Designed to understand, reason about, an
 
 Sets up isolated execution environments for AI agents to work on GitHub repositories with tools to understand code, edit files, and much more.
 
-### Agent Environment (The Shadow Realm)
+### Agent Environment (The Maru Realm)
 - GitHub repository integration with branch management
 - Pull request generation with AI-authored commits
 - Real-time task status tracking and progress updates
@@ -20,12 +20,12 @@ Sets up isolated execution environments for AI agents to work on GitHub reposito
 - Tool execution with file operations, terminal commands, and code search
 - Memory system for repository-specific knowledge retention
 - Semantic code search, background processing
-- Lightweight Shadow Wiki generation for comprehensive codebase documentation
-- Custom rules for Shadow code generation
+- Lightweight Maru Wiki generation for comprehensive codebase documentation
+- Custom rules for Maru code generation
 
 ## Execution Modes
 
-Shadow supports two execution modes through an abstraction layer:
+Maru supports two execution modes through an abstraction layer:
 
 ### Local Mode
 - Direct filesystem execution on the host machine
@@ -61,7 +61,7 @@ Mode selection is controlled by `NODE_ENV` and `AGENT_MODE` environment variable
 1. Clone the repository and install dependencies:
 ```bash
 git clone <repository-url>
-cd shadow
+cd maru
 npm install
 ```
 
@@ -76,10 +76,10 @@ cp packages/db/.env.template packages/db/.env
 3. Configure the database:
 ```bash
 # Create local PostgreSQL database
-psql -U postgres -c "CREATE DATABASE shadow_dev;"
+psql -U postgres -c "CREATE DATABASE maru_dev;"
 
 # Update packages/db/.env with your database URL
-DATABASE_URL="postgres://postgres:@127.0.0.1:5432/shadow_dev"
+DATABASE_URL="postgres://postgres:@127.0.0.1:5432/maru_dev"
 
 # Generate Prisma client and push schema
 npm run generate
@@ -115,7 +115,7 @@ An easy way to do this is run the `./setup-script.sh` which will take in your in
 `apps/server/.env`
 ```bash
 # Required
-DATABASE_URL="postgres://postgres:@127.0.0.1:5432/shadow_dev"
+DATABASE_URL="postgres://postgres:@127.0.0.1:5432/maru_dev"
 BETTER_AUTH_SECRET="dev-secret"
 
 GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxx
@@ -126,7 +126,7 @@ AGENT_MODE=local
 
 # Optional: Pinecone for semantic search
 PINECONE_API_KEY="" # TODO: Set this to your Pinecone API key
-PINECONE_INDEX_NAME="shadow"
+PINECONE_INDEX_NAME="maru"
 
 # Workspace directory for local agent:
 WORKSPACE_DIR= # TODO: Set this to your local workspace directory
@@ -150,8 +150,8 @@ BETTER_AUTH_SECRET=dev-secret
 
 `packages/db/.env`
 ```bash
-DATABASE_URL="postgres://postgres:@127.0.0.1:5432/shadow_dev"
-DIRECT_URL="postgres://postgres:@127.0.0.1:5432/shadow_dev"
+DATABASE_URL="postgres://postgres:@127.0.0.1:5432/maru_dev"
+DIRECT_URL="postgres://postgres:@127.0.0.1:5432/maru_dev"
 ```
 
 With `GITHUB_PERSONAL_ACCESS_TOKEN` set on the server and `NEXT_PUBLIC_VERCEL_ENV` not equal to `production`, the backend uses your PAT for repo/branch/issue queries. The frontend's GitHub selector works immediately.
@@ -204,7 +204,7 @@ npm run build --filter=sidecar
 
 ## Tool System
 
-Shadow provides a comprehensive set of tools for AI agents:
+Maru provides a comprehensive set of tools for AI agents:
 
 ### File Operations
 - `read_file` - Read file contents with line range support
@@ -253,7 +253,7 @@ Shadow provides a comprehensive set of tools for AI agents:
 4. Test in both local and remote modes
 5. Submit a pull request
    
-We're excited to see what you've built with Shadow!
+We're excited to see what you've built with Maru!
 
 
 ---

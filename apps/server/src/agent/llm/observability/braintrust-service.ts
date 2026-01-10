@@ -31,7 +31,7 @@ export class BraintrustService {
     return {
       isEnabled: true,
       metadata: {
-        service: "shadow-agent",
+        service: "maru-agent",
         environment: config.nodeEnv,
         nodeVersion: process.version,
         timestamp: new Date().toISOString(),

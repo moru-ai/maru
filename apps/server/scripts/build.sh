@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Shadow Server Build Script
+# Maru Server Build Script
 # Compiles TypeScript and copies required assets
 
 set -e  # Exit on any error
 
-echo "🔨 Building Shadow Server..."
+echo "🔨 Building Maru Server..."
 
 echo "🧹 Cleaning previous build..."
 rm -rf dist

@@ -42,7 +42,7 @@ export class ApiKeyValidator {
         method: "GET",
         headers: {
           Authorization: `Bearer ${apiKey}`,
-          "User-Agent": "Shadow-Agent/1.0",
+          "User-Agent": "Maru-Agent/1.0",
         },
         signal: AbortSignal.timeout(5000),
       });
@@ -113,7 +113,7 @@ export class ApiKeyValidator {
         headers: {
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
-          "User-Agent": "Shadow-Agent/1.0",
+          "User-Agent": "Maru-Agent/1.0",
         },
         signal: AbortSignal.timeout(5000),
       });
@@ -183,8 +183,8 @@ export class ApiKeyValidator {
         method: "GET",
         headers: {
           Authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": "https://shadow-agent.com",
-          "X-Title": "Shadow Agent Validation",
+          "HTTP-Referer": "https://maru-agent.com",
+          "X-Title": "Maru Agent Validation",
         },
         signal: AbortSignal.timeout(5000),
       });

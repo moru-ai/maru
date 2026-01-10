@@ -27,17 +27,17 @@ const departureMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Shadow",
+  title: "Maru",
   description:
     "An open-source background agent and web interface to build, debug, and understand code.",
   icons: {
     icon: [
       {
-        url: "/shadow-black.svg",
+        url: "/maru-black.svg",
         media: "(prefers-color-scheme: light)",
       },
       {
-        url: "/shadow.svg",
+        url: "/maru.svg",
         media: "(prefers-color-scheme: dark)",
       },
     ],

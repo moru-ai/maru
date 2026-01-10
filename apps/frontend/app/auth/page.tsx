@@ -27,7 +27,7 @@ export default function AuthPage() {
           <LogoBurst size="lg" />
           <span className="@[400px]:inline hidden">Code with </span>
           <span className="@min-[400px]:text-muted-foreground inline-flex items-center gap-2">
-            Shadow
+            Maru
           </span>
         </div>
 
@@ -45,9 +45,9 @@ export default function AuthPage() {
 
         <div className="animate-in fade-in fill-mode-both ease-out-quad delay-2000 mt-6 flex flex-col gap-2 duration-500">
           <div className="text-muted-foreground text-center text-sm">
-            Shadow is an{" "}
+            Maru is an{" "}
             <a
-              href="https://github.com/ishaan1013/shadow"
+              href="https://github.com/moru-ai/maru"
               target="_blank"
               className="text-foreground inline-block cursor-pointer font-medium hover:underline hover:opacity-90"
               rel="noreferrer"

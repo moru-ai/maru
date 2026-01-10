@@ -166,7 +166,7 @@ export const GitConfigRequestSchema = z.object({
 
 export const GitBranchRequestSchema = z.object({
   baseBranch: z.string(),
-  shadowBranch: z.string(),
+  maruBranch: z.string(),
 });
 
 export const GitCommitRequestSchema = z.object({
@@ -213,7 +213,7 @@ export interface GitConfigResponse extends SidecarResponse {
 
 export interface GitBranchResponse extends SidecarResponse {
   baseBranch?: string;
-  shadowBranch?: string;
+  maruBranch?: string;
   baseCommitSha?: string;
 }
 

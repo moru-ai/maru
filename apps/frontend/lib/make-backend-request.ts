@@ -22,12 +22,12 @@ export async function makeBackendRequest(
   };
 
   if (process.env.VERCEL_ENV === "production") {
-    const apiKey = process.env.SHADOW_API_KEY;
+    const apiKey = process.env.MARU_API_KEY;
     if (apiKey) {
       headers["Authorization"] = `Bearer ${apiKey}`;
     } else {
       console.warn(
-        "[makeBackendRequest] SHADOW_API_KEY not found - required in production environment"
+        "[makeBackendRequest] MARU_API_KEY not found - required in production environment"
       );
     }
   }

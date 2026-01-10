@@ -157,7 +157,7 @@ export function SidebarNavigation({
             >
               <a
                 target="_blank"
-                href="https://github.com/ishaan1013/shadow"
+                href="https://github.com/moru-ai/maru"
                 rel="noreferrer"
               >
                 <GithubLogo />
@@ -165,7 +165,7 @@ export function SidebarNavigation({
             </Button>
           </TooltipTrigger>
           <TooltipContent lighter side="right">
-            Shadow Source Code
+            Maru Source Code
           </TooltipContent>
         </Tooltip>
         <Tooltip>

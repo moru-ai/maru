@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-export function ShadowLogoHoverSvg({ className }: { className?: string }) {
+export function MaruLogoHoverSvg({ className }: { className?: string }) {
   return (
     <svg
       width="100%"

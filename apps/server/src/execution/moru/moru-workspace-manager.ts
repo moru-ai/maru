@@ -37,7 +37,7 @@ export class MoruWorkspaceManager implements WorkspaceManager {
       };
 
       // Create new Moru sandbox
-      const sandbox = await Sandbox.create(config.moruTemplateId || "shadow-agent", {
+      const sandbox = await Sandbox.create(config.moruTemplateId || "maru-agent", {
         apiKey: config.moruApiKey,
         timeoutMs: config.moruSandboxTimeoutMs || 3600000,
         metadata,

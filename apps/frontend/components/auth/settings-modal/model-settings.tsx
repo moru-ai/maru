@@ -50,24 +50,16 @@ export function ModelSettings() {
   const { openProviderConfig } = useModal();
   const setSelectedModelMutation = useSetSelectedModel();
 
-  const [openaiInput, setOpenaiInput] = useState(apiKeys?.openai ?? "");
   const [anthropicInput, setAnthropicInput] = useState(
     apiKeys?.anthropic ?? ""
   );
-  const [openrouterInput, setOpenrouterInput] = useState(
-    apiKeys?.openrouter ?? ""
-  );
-  const [savingOpenai, setSavingOpenai] = useState(false);
   const [savingAnthropic, setSavingAnthropic] = useState(false);
-  const [savingOpenrouter, setSavingOpenrouter] = useState(false);
 
   const [apiKeyVisibility, setApiKeyVisibility] = useState<
     Record<ApiKeyProvider, boolean>
   >({
-    openai: false,
     anthropic: false,
-    openrouter: false,
-  });
+  } as Record<ApiKeyProvider, boolean>);
 
   const handleToggleShowApiKey = (provider: ApiKeyProvider) => {
     setApiKeyVisibility((prev) => ({
@@ -102,25 +94,14 @@ export function ModelSettings() {
   };
 
   useEffect(() => {
-    setOpenaiInput(apiKeys?.openai ?? "");
     setAnthropicInput(apiKeys?.anthropic ?? "");
-    setOpenrouterInput(apiKeys?.openrouter ?? "");
   }, [apiKeys]);
 
   const saveApiKey = async (provider: ApiKeyProvider, key: string) => {
     // Only save if key is different from current saved value
-    const currentKey =
-      provider === "openai"
-        ? apiKeys?.openai
-        : provider === "anthropic"
-          ? apiKeys?.anthropic
-          : provider === "openrouter"
-            ? apiKeys?.openrouter
-            : undefined;
+    const currentKey = provider === "anthropic" ? apiKeys?.anthropic : undefined;
     if (key === currentKey) {
-      if (provider === "openai") setSavingOpenai(false);
-      else if (provider === "anthropic") setSavingAnthropic(false);
-      else if (provider === "openrouter") setSavingOpenrouter(false);
+      if (provider === "anthropic") setSavingAnthropic(false);
       return;
     }
 
@@ -202,27 +183,12 @@ export function ModelSettings() {
         queryClient.invalidateQueries({ queryKey: ["api-key-validation"] });
       }
     } catch (_error) {
-      const providerName =
-        provider === "openai"
-          ? "OpenAI"
-          : provider === "anthropic"
-            ? "Anthropic"
-            : provider === "openrouter"
-              ? "OpenRouter"
-              : "Unknown";
+      const providerName = provider === "anthropic" ? "Anthropic" : "Unknown";
       toast.error(`Failed to save ${providerName} API key`);
     } finally {
-      if (provider === "openai") setSavingOpenai(false);
-      else if (provider === "anthropic") setSavingAnthropic(false);
-      else if (provider === "openrouter") setSavingOpenrouter(false);
+      if (provider === "anthropic") setSavingAnthropic(false);
     }
   };
-
-  const { debouncedCallback: debouncedSaveOpenai, cancel: cancelOpenaiSave } =
-    useDebounceCallbackWithCancel(
-      (key: string) => saveApiKey("openai", key),
-      200
-    );
 
   const {
     debouncedCallback: debouncedSaveAnthropic,
@@ -232,30 +198,10 @@ export function ModelSettings() {
     200
   );
 
-  const {
-    debouncedCallback: debouncedSaveOpenrouter,
-    cancel: cancelOpenrouterSave,
-  } = useDebounceCallbackWithCancel(
-    (key: string) => saveApiKey("openrouter", key),
-    200
-  );
-
-  const handleOpenaiChange = (value: string) => {
-    setOpenaiInput(value);
-    setSavingOpenai(true);
-    debouncedSaveOpenai(value);
-  };
-
   const handleAnthropicChange = (value: string) => {
     setAnthropicInput(value);
     setSavingAnthropic(true);
     debouncedSaveAnthropic(value);
-  };
-
-  const handleOpenrouterChange = (value: string) => {
-    setOpenrouterInput(value);
-    setSavingOpenrouter(true);
-    debouncedSaveOpenrouter(value);
   };
 
   const handleClearApiKey = async (provider: ApiKeyProvider) => {
@@ -271,18 +217,10 @@ export function ModelSettings() {
       }
 
       await clearApiKeyMutation.mutateAsync(provider);
-      if (provider === "openai") {
-        setOpenaiInput("");
-        cancelOpenaiSave();
-        setSavingOpenai(false);
-      } else if (provider === "anthropic") {
+      if (provider === "anthropic") {
         setAnthropicInput("");
         cancelAnthropicSave();
         setSavingAnthropic(false);
-      } else if (provider === "openrouter") {
-        setOpenrouterInput("");
-        cancelOpenrouterSave();
-        setSavingOpenrouter(false);
       }
 
       // Clear validation result for this provider
@@ -295,14 +233,7 @@ export function ModelSettings() {
       queryClient.invalidateQueries({ queryKey: ["api-keys"] });
       queryClient.invalidateQueries({ queryKey: ["api-key-validation"] });
     } catch (_error) {
-      const providerName =
-        provider === "openai"
-          ? "OpenAI"
-          : provider === "anthropic"
-            ? "Anthropic"
-            : provider === "openrouter"
-              ? "OpenRouter"
-              : "Unknown";
+      const providerName = provider === "anthropic" ? "Anthropic" : "Unknown";
       toast.error(`Failed to clear ${providerName} API key`);
     }
   };
@@ -317,25 +248,11 @@ export function ModelSettings() {
 
   const providers = [
     {
-      key: "openai",
-      name: "OpenAI",
-      input: openaiInput,
-      saving: savingOpenai,
-      handleChange: handleOpenaiChange,
-    },
-    {
       key: "anthropic",
       name: "Anthropic",
       input: anthropicInput,
       saving: savingAnthropic,
       handleChange: handleAnthropicChange,
-    },
-    {
-      key: "openrouter",
-      name: "OpenRouter",
-      input: openrouterInput,
-      saving: savingOpenrouter,
-      handleChange: handleOpenrouterChange,
     },
   ];
 
@@ -437,7 +354,7 @@ export function ModelSettings() {
       })}
 
       <div className="text-muted-foreground flex w-full flex-col gap-1 border-t pt-4 text-xs">
-        <span>Shadow is BYOK; you must provide an API key to use models.</span>
+        <span>Maru is BYOK; you must provide an API key to use models.</span>
         <span>
           Keys are stored securely in cookies, never stored permanently on our
           servers.

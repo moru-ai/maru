@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-export function ShadowLogoSvg({ className }: { className?: string }) {
+export function MaruLogoSvg({ className }: { className?: string }) {
   return (
     <svg
       width="100%"

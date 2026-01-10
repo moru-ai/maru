@@ -1,4 +1,4 @@
-# Shadow Development Guide
+# Maru Development Guide
 
 ## Quick Start
 
