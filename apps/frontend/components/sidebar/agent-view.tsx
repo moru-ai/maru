@@ -4,6 +4,7 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { useTask } from "@/hooks/tasks/use-task";
 import { useSessionEntries } from "@/hooks/session/use-session-entries";
@@ -17,7 +18,7 @@ import {
   Square,
   SquareCheck,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { statusColorsConfig } from "./status";
 import { FileExplorer } from "@/components/agent-environment/file-explorer";
 import { FileNode } from "@repo/types";
@@ -88,9 +89,36 @@ export function SidebarAgentView({ taskId }: { taskId: string }) {
   const { task, fileChanges, diffStats } = useTask(taskId);
   const { entries } = useSessionEntries(taskId);
   const { updateSelectedFilePath, openAgentEnvironment } = useAgentEnvironment();
+  const { setOpen } = useSidebar();
 
   // Derive todos from session entries (JSONL data)
   const todos = useMemo(() => extractTodosFromEntries(entries), [entries]);
+
+  // Track previous todos to detect changes
+  const prevTodosRef = useRef<typeof todos>([]);
+
+  // Open sidebar when todos change (new todos added or status changed)
+  useEffect(() => {
+    const prevTodos = prevTodosRef.current;
+
+    // Skip if both are empty ([] -> [] is not a change)
+    if (prevTodos.length === 0 && todos.length === 0) {
+      return;
+    }
+
+    const todosChanged =
+      todos.length !== prevTodos.length ||
+      todos.some((todo, i) =>
+        prevTodos[i]?.content !== todo.content ||
+        prevTodos[i]?.status !== todo.status
+      );
+
+    if (todosChanged && todos.length > 0) {
+      setOpen(true);
+    }
+
+    prevTodosRef.current = todos;
+  }, [todos, setOpen]);
 
   const completedTodos = useMemo(
     () => todos.filter((todo) => todo.status === "completed").length,
