@@ -266,7 +266,7 @@ export function PromptForm({
               onBlur={onBlur}
               placeholder={
                 isHome
-                  ? "Build features, fix bugs, and understand codebases..."
+                  ? "Ask anything"
                   : "Follow-up message..."
               }
               className="placeholder:text-muted-foreground/50 bg-transparent! max-h-48 flex-1 resize-none border-0 shadow-none focus-visible:ring-0"
