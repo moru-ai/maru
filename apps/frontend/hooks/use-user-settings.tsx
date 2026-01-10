@@ -11,10 +11,8 @@ interface UserSettings {
   id: string;
   userId: string;
   autoPullRequest: boolean;
-  enableShadowWiki: boolean;
   memoriesEnabled: boolean;
   selectedModels: string[];
-  enableIndexing: boolean;
   rules?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -23,9 +21,7 @@ interface UserSettings {
 type UpdateUserSettingsParams = {
   autoPullRequest?: boolean;
   memoriesEnabled?: boolean;
-  enableShadowWiki?: boolean;
   selectedModels?: string[];
-  enableIndexing?: boolean;
   rules?: string | null;
 };
 
@@ -54,9 +50,7 @@ async function fetchUserSettings(): Promise<UserSettings> {
 async function updateUserSettingsAPI(settings: {
   autoPullRequest?: boolean;
   memoriesEnabled?: boolean;
-  enableShadowWiki?: boolean;
   selectedModels?: string[];
-  enableIndexing?: boolean;
   rules?: string | null;
 }): Promise<UserSettings> {
   const response = await fetch("/api/user-settings", {

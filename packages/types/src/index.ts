@@ -40,8 +40,6 @@ export * from "./codebase-understanding/summaries";
 // === GitHub Types ===
 export * from "./github";
 
-// === Indexing Types ===
-export * from "./indexing/options";
 // === API Keys Types ===
 export * from "./api-keys";
 

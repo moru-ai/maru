@@ -64,14 +64,6 @@ export function UserSettings() {
     updateUserSettings.mutate({ memoriesEnabled: checked });
   };
 
-  const handleShadowWikiToggle = (checked: boolean) => {
-    updateUserSettings.mutate({ enableShadowWiki: checked });
-  };
-
-  const handleIndexingToggle = (checked: boolean) => {
-    updateUserSettings.mutate({ enableIndexing: checked });
-  };
-
   const handleRulesChange = (value: string) => {
     const words = value
       .trim()
@@ -153,36 +145,6 @@ export function UserSettings() {
                 id="memories-enabled"
                 checked={userSettings?.memoriesEnabled ?? false}
                 onCheckedChange={handleMemoriesEnabledToggle}
-                disabled={isLoadingSettings}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="shadow-wiki" className="flex flex-col gap-0">
-                <div className="text-sm font-normal">Enable Shadow Wiki</div>
-                <div className="text-muted-foreground text-xs">
-                  Auto-generate codebase understanding docs for AI context
-                </div>
-              </label>
-              <Checkbox
-                id="shadow-wiki"
-                checked={userSettings?.enableShadowWiki ?? true}
-                onCheckedChange={handleShadowWikiToggle}
-                disabled={isLoadingSettings}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="enable-indexing" className="flex flex-col gap-0">
-                <div className="text-sm font-normal">
-                  Enable Semantic Search
-                </div>
-                <div className="text-muted-foreground text-xs">
-                  Embed your codebases to let the agent do semantic search
-                </div>
-              </label>
-              <Checkbox
-                id="enable-indexing"
-                checked={userSettings?.enableIndexing ?? false}
-                onCheckedChange={handleIndexingToggle}
                 disabled={isLoadingSettings}
               />
             </div>

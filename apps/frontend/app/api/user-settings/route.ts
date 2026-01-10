@@ -38,21 +38,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { autoPullRequest, enableShadowWiki, memoriesEnabled, selectedModels, enableIndexing, rules } =
-      body;
+    const { autoPullRequest, memoriesEnabled, selectedModels, rules } = body;
 
     // Validate autoPullRequest if provided
     if (autoPullRequest !== undefined && typeof autoPullRequest !== "boolean") {
       return NextResponse.json(
         { error: "autoPullRequest must be a boolean" },
-        { status: 400 }
-      );
-    }
-
-    // Validate enableShadowWiki if provided
-    if (enableShadowWiki !== undefined && typeof enableShadowWiki !== "boolean") {
-      return NextResponse.json(
-        { error: "enableShadowWiki must be a boolean" },
         { status: 400 }
       );
     }
@@ -73,14 +64,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate enableIndexing if provided
-    if (enableIndexing !== undefined && typeof enableIndexing !== "boolean") {
-      return NextResponse.json(
-        { error: "enableIndexing must be a boolean" },
-        { status: 400 }
-      );
-    }
-
     // Validate rules if provided
     if (rules !== undefined && rules !== null && typeof rules !== "string") {
       return NextResponse.json(
@@ -91,7 +74,10 @@ export async function POST(request: NextRequest) {
 
     // Validate rules word count if provided
     if (rules && typeof rules === "string") {
-      const wordCount = rules.trim().split(/\s+/).filter(word => word.length > 0).length;
+      const wordCount = rules
+        .trim()
+        .split(/\s+/)
+        .filter((word) => word.length > 0).length;
       if (wordCount > 100) {
         return NextResponse.json(
           { error: "rules cannot exceed 100 words" },
@@ -103,24 +89,16 @@ export async function POST(request: NextRequest) {
     // Build update object with only provided fields
     const updateData: {
       autoPullRequest?: boolean;
-      enableShadowWiki?: boolean;
       memoriesEnabled?: boolean;
       selectedModels?: string[];
-      enableIndexing?: boolean;
       rules?: string;
     } = {};
     if (autoPullRequest !== undefined)
       updateData.autoPullRequest = autoPullRequest;
-    if (enableShadowWiki !== undefined)
-      updateData.enableShadowWiki = enableShadowWiki;
     if (memoriesEnabled !== undefined)
       updateData.memoriesEnabled = memoriesEnabled;
-    if (selectedModels !== undefined)
-      updateData.selectedModels = selectedModels;
-    if (enableIndexing !== undefined)
-      updateData.enableIndexing = enableIndexing;
-    if (rules !== undefined)
-      updateData.rules = rules || null;
+    if (selectedModels !== undefined) updateData.selectedModels = selectedModels;
+    if (rules !== undefined) updateData.rules = rules || null;
 
     const settings = await updateUserSettings(session.user.id, updateData);
 

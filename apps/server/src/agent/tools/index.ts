@@ -13,12 +13,10 @@ import {
   GrepSearchParamsSchema,
   FileSearchParamsSchema,
   DeleteFileParamsSchema,
-  SemanticSearchParamsSchema,
 } from "@repo/types";
 import { createToolExecutor, isLocalMode } from "../../execution";
 import { LocalFileSystemWatcher } from "../../services/local-filesystem-watcher";
 import { emitTerminalOutput, emitStreamChunk } from "../../socket";
-import { isIndexingComplete } from "../../initialization/background-indexing";
 import type { TerminalEntry } from "@repo/types";
 import { MCPManager } from "../mcp/mcp-manager";
 import {
@@ -205,31 +203,6 @@ export async function createTools(taskId: string, workspacePath?: string) {
         );
       }
     }
-  }
-
-  // Check if semantic search should be available
-  let includeSemanticSearch = false;
-  try {
-    const task = await prisma.task.findUnique({
-      where: { id: taskId },
-      select: { repoUrl: true },
-    });
-
-    if (task) {
-      const repoMatch = task.repoUrl.match(/github\.com\/([^/]+\/[^/]+)/);
-      const repo = repoMatch ? repoMatch[1] : null;
-      if (repo) {
-        includeSemanticSearch = await isIndexingComplete(repo);
-        console.log(
-          `[TOOLS] Semantic search ${includeSemanticSearch ? "enabled" : "disabled"} for repo ${repo} (indexing ${includeSemanticSearch ? "complete" : "incomplete"})`
-        );
-      }
-    }
-  } catch (error) {
-    console.error(
-      `[TOOLS] Failed to check indexing status for task ${taskId}:`,
-      error
-    );
   }
 
   const baseTools = {
@@ -757,78 +730,6 @@ export async function createTools(taskId: string, workspacePath?: string) {
         error
       );
     }
-  }
-
-  // Conditionally add semantic search tool if indexing is complete
-  if (includeSemanticSearch) {
-    return {
-      ...baseTools,
-      semantic_search: tool({
-        description: readDescription("semantic_search"),
-        parameters: SemanticSearchParamsSchema,
-        execute: async ({ query, explanation }) => {
-          console.log(`[SEMANTIC_SEARCH] ${explanation}`);
-
-          const task = await prisma.task.findUnique({
-            where: { id: taskId },
-            select: { repoUrl: true },
-          });
-
-          if (!task) {
-            throw new Error(`Task ${taskId} not found`);
-          }
-
-          // eslint-disable-next-line no-useless-escape
-          const repoMatch = task.repoUrl.match(/github\.com\/([^\/]+\/[^\/]+)/);
-          const repo = repoMatch ? repoMatch[1] : task.repoUrl;
-          if (!repo) {
-            console.warn(
-              `[SEMANTIC_SEARCH] No repo found for task ${taskId}, falling back to grep_search`
-            );
-            const grepResult = await executor.grepSearch(query);
-
-            // Convert GrepResult to SemanticSearchToolResult format
-            const results =
-              grepResult.detailedMatches?.map((match, i) => ({
-                id: i + 1,
-                content: match.content,
-                relevance: 0.8,
-                filePath: match.file,
-                lineStart: match.lineNumber,
-                lineEnd: match.lineNumber,
-                language: "",
-                kind: "",
-              })) ||
-              (grepResult.matches || []).map((match, i) => ({
-                id: i + 1,
-                content: match,
-                relevance: 0.8,
-                filePath: "",
-                lineStart: 0,
-                lineEnd: 0,
-                language: "",
-                kind: "",
-              }));
-
-            return {
-              success: grepResult.success,
-              results,
-              query: query,
-              searchTerms: query.split(/\s+/).filter((term) => term.length > 0),
-              message:
-                (grepResult.message || "Failed to search") +
-                " (fallback to grep)",
-              error: grepResult.error,
-            };
-          } else {
-            console.log(`[SEMANTIC_SEARCH] Using repo: ${repo}`);
-            const result = await executor.semanticSearch(query, repo);
-            return result;
-          }
-        },
-      }),
-      ...mcpTools, // Add MCP tools to the toolset
-    };
   }
 
   return {

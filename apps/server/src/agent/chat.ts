@@ -579,12 +579,7 @@ export class ChatService {
 
         const initializationEngine = new TaskInitializationEngine();
         const initSteps = await initializationEngine.getDefaultStepsForTask();
-        await initializationEngine.initializeTask(
-          taskId,
-          initSteps,
-          userId,
-          context
-        );
+        await initializationEngine.initializeTask(taskId, initSteps, userId);
 
         await updateTaskStatus(taskId, "RUNNING", "CHAT");
       }
@@ -1725,12 +1720,7 @@ These are specific instructions from the user that should be followed throughout
       // Start task initialization in background (non-blocking)
       // This will handle workspace setup, VM creation, etc.
       initializationEngine
-        .initializeTask(
-          taskId,
-          undefined, // Use default steps
-          _userId,
-          newTaskContext
-        )
+        .initializeTask(taskId, undefined, _userId)
         .catch((error: unknown) => {
           console.error(
             `[CHAT] Failed to initialize stacked task ${taskId}:`,

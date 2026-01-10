@@ -411,11 +411,7 @@ export function createSocketServer(
           data.llmModel as ModelType
         );
 
-        await ensureTaskInfrastructureExists(
-          data.taskId,
-          task.userId,
-          modelContext
-        );
+        await ensureTaskInfrastructureExists(data.taskId, task.userId);
 
         await updateTaskStatus(data.taskId, "RUNNING", "SOCKET");
         startTerminalPolling(data.taskId);
@@ -520,11 +516,7 @@ export function createSocketServer(
         );
 
         // Ensure task infrastructure exists before proceeding
-        await ensureTaskInfrastructureExists(
-          data.taskId,
-          task.userId,
-          modelContext
-        );
+        await ensureTaskInfrastructureExists(data.taskId, task.userId);
 
         await updateTaskStatus(data.taskId, "RUNNING", "SOCKET");
         startTerminalPolling(data.taskId);

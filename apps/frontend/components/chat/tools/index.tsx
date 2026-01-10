@@ -2,7 +2,6 @@ import type { Message } from "@repo/types";
 import { isMCPTool as checkIfMCPTool } from "@repo/types";
 
 // Tool-specific components
-import { SemanticSearchTool } from "./semantic-search";
 import { DeleteFileTool } from "./delete-file";
 import { EditFileTool } from "./edit-file";
 import { FileSearchTool } from "./file-search";
@@ -20,7 +19,6 @@ import { MCPTool } from "./mcp-tool";
 
 const TOOL_COMPONENTS = {
   todo_write: TodoWriteTool,
-  semantic_search: SemanticSearchTool,
   read_file: ReadFileTool,
   run_terminal_cmd: RunTerminalCmdTool,
   list_dir: ListDirTool,
@@ -65,7 +63,6 @@ export function ToolMessage({ message }: { message: Message }) {
 }
 
 export {
-  SemanticSearchTool,
   DeleteFileTool,
   EditFileTool,
   FileSearchTool,

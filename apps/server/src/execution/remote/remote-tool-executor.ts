@@ -12,7 +12,6 @@ import {
   SearchOptions,
   WriteResult,
   SearchReplaceResult,
-  SemanticSearchToolResult,
   GitStatusResponse,
   GitDiffResponse,
   GitCommitResponse,
@@ -28,7 +27,6 @@ import {
   RecursiveDirectoryListing,
 } from "@repo/types";
 import { CommandResult } from "../interfaces/types";
-import { performSemanticSearch } from "@/utils/semantic-search";
 import { GitUser } from "../../services/git-manager";
 
 /**
@@ -363,31 +361,6 @@ export class RemoteToolExecutor implements ToolExecutor {
         detailedMatches: [],
         matchCount: 0,
         message: `Failed to search with grep: ${query}`,
-      };
-    }
-  }
-
-  async semanticSearch(
-    query: string,
-    repo: string,
-    _options?: SearchOptions
-  ): Promise<SemanticSearchToolResult> {
-    try {
-      return await performSemanticSearch({ query, repo });
-    } catch (error) {
-      console.error(
-        `[SEMANTIC_SEARCH_ERROR] Failed to query indexing service:`,
-        error
-      );
-
-      // Return error result
-      return {
-        success: false,
-        results: [],
-        query: query,
-        searchTerms: query.split(/\s+/).filter((term) => term.length > 0),
-        message: `Semantic search failed for "${query}"`,
-        error: error instanceof Error ? error.message : "Unknown error",
       };
     }
   }

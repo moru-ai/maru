@@ -14,7 +14,6 @@ import {
   ReadFileOptions,
   WriteResult,
   SearchReplaceResult,
-  SemanticSearchToolResult,
   SearchOptions,
   GitStatusResponse,
   GitDiffResponse,
@@ -27,7 +26,6 @@ import {
   MAX_LINES_PER_READ,
 } from "@repo/types";
 import { CommandResult } from "../interfaces/types";
-import { performSemanticSearch } from "@/utils/semantic-search";
 
 /**
  * MoruToolExecutor implements tool operations using Moru Sandbox VMs
@@ -596,31 +594,6 @@ export class MoruToolExecutor implements ToolExecutor {
         detailedMatches: [],
         query,
         matchCount: 0,
-      };
-    }
-  }
-
-  async semanticSearch(
-    query: string,
-    repo: string,
-    _options?: SearchOptions
-  ): Promise<SemanticSearchToolResult> {
-    try {
-      // Semantic search uses Pinecone - same as local executor
-      return await performSemanticSearch({ query, repo });
-    } catch (error) {
-      console.error(
-        `[SEMANTIC_SEARCH_ERROR] Failed to query indexing service:`,
-        error
-      );
-
-      return {
-        success: false,
-        results: [],
-        query: query,
-        searchTerms: query.split(/\s+/).filter((term) => term.length > 0),
-        message: `Semantic search failed for "${query}"`,
-        error: error instanceof Error ? error.message : "Unknown error",
       };
     }
   }

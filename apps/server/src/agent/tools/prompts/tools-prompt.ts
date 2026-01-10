@@ -42,9 +42,6 @@ ${readToolInstructions("file_search")}
 
 ### delete_file
 ${readToolInstructions("delete_file")}
-
-### semantic_search
-${readToolInstructions("semantic_search")}
 </tool_guidance>`;
 
 /**
@@ -74,18 +71,6 @@ export function generateToolGuidance(availableTools?: ToolSet): string {
     if (availableTools[toolName]) {
       toolSections.push(`### ${toolName}\n${readToolInstructions(toolName)}`);
     }
-  }
-
-  // Conditionally include semantic search
-  if (availableTools.semantic_search) {
-    toolSections.push(
-      `### semantic_search\n${readToolInstructions("semantic_search")}`
-    );
-  } else {
-    // Add helpful message about semantic search availability
-    toolSections.push(
-      `### semantic_search (Currently Unavailable)\nSemantic search is not available for this repository yet. Code indexing may still be in progress. Use grep_search for pattern-based code searching instead.`
-    );
   }
 
   return `<tool_guidance>

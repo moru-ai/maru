@@ -11,7 +11,6 @@ import {
   TaskConfig,
 } from "../interfaces/types";
 import { LocalToolExecutor } from "./local-tool-executor";
-import logger from "@/indexing/logger";
 
 /**
  * LocalWorkspaceManager implements workspace management for local filesystem execution
@@ -285,12 +284,12 @@ export class LocalWorkspaceManager implements WorkspaceManager {
                 type: "file",
               });
             } catch (error) {
-              logger.error(`Error reading file ${relativeFilePath}: ${error}`);
+              console.error(`Error reading file ${relativeFilePath}: ${error}`);
             }
           }
         }
       } catch (error) {
-        logger.error(`Error reading directory ${dirPath}: ${error}`);
+        console.error(`Error reading directory ${dirPath}: ${error}`);
       }
     };
 

@@ -180,7 +180,6 @@ export type {
   DirectoryListing,
   FileSearchResult,
   GrepResult,
-  SemanticSearchToolResult,
 } from "@repo/types";
 export type {
   CommandResult,

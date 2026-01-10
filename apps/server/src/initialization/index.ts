@@ -12,8 +12,6 @@ import {
   setTaskInitialized,
 } from "../utils/task-status";
 import { getGitHubAccessToken } from "../github/auth/account-service";
-import { BackgroundServiceManager } from "./background-service-manager";
-import { TaskModelContext } from "../services/task-model-context";
 
 // Helper for async delays
 const delay = (ms: number) =>
@@ -21,11 +19,9 @@ const delay = (ms: number) =>
 
 export class TaskInitializationEngine {
   private abstractWorkspaceManager: AbstractWorkspaceManager;
-  private backgroundServiceManager: BackgroundServiceManager;
 
   constructor() {
     this.abstractWorkspaceManager = createWorkspaceManager(); // Abstraction layer for all modes
-    this.backgroundServiceManager = new BackgroundServiceManager();
   }
 
   /**
@@ -34,8 +30,7 @@ export class TaskInitializationEngine {
   async initializeTask(
     taskId: string,
     steps: InitStatus[] = ["PREPARE_WORKSPACE"],
-    userId: string,
-    context: TaskModelContext
+    userId: string
   ): Promise<void> {
     try {
       // Clear any previous progress and start fresh
@@ -65,7 +60,7 @@ export class TaskInitializationEngine {
           });
 
           // Execute the step
-          await this.executeStep(taskId, step, userId, context);
+          await this.executeStep(taskId, step, userId);
 
           // Mark step as completed
           await setInitStatus(taskId, step);
@@ -118,8 +113,7 @@ export class TaskInitializationEngine {
   private async executeStep(
     taskId: string,
     step: InitStatus,
-    userId: string,
-    context: TaskModelContext
+    userId: string
   ): Promise<void> {
     switch (step) {
       case "PREPARE_WORKSPACE":
@@ -136,18 +130,6 @@ export class TaskInitializationEngine {
 
       case "VERIFY_VM_WORKSPACE":
         await this.executeVerifyVMWorkspace(taskId, userId);
-        break;
-
-      case "START_BACKGROUND_SERVICES":
-        await this.executeStartBackgroundServices(taskId, userId, context);
-        break;
-
-      case "INSTALL_DEPENDENCIES":
-        await this.executeInstallDependencies(taskId);
-        break;
-
-      case "COMPLETE_SHADOW_WIKI":
-        await this.executeCompleteShadowWiki(taskId);
         break;
 
       // Moru mode steps
@@ -354,184 +336,6 @@ export class TaskInitializationEngine {
         error
       );
       throw error;
-    }
-  }
-
-  /**
-   * Install dependencies step - Install project dependencies (npm, pip, etc.)
-   */
-  private async executeInstallDependencies(taskId: string): Promise<void> {
-    try {
-      // Get the executor for this task
-      const executor = await this.abstractWorkspaceManager.getExecutor(taskId);
-
-      // Check for package.json and install Node.js dependencies with appropriate package manager
-      const packageJsonExists = await this.checkFileExists(
-        executor,
-        "package.json"
-      );
-      if (packageJsonExists) {
-        // Determine which package manager to use based on lockfiles
-        const yarnLockExists = await this.checkFileExists(
-          executor,
-          "yarn.lock"
-        );
-        const pnpmLockExists = await this.checkFileExists(
-          executor,
-          "pnpm-lock.yaml"
-        );
-        const bunLockExists = await this.checkFileExists(executor, "bun.lockb");
-
-        if (bunLockExists) {
-          await this.runInstallCommand(executor, taskId, "bun install");
-        } else if (pnpmLockExists) {
-          await this.runInstallCommand(executor, taskId, "pnpm install");
-        } else if (yarnLockExists) {
-          await this.runInstallCommand(executor, taskId, "yarn install");
-        } else {
-          await this.runInstallCommand(executor, taskId, "npm install");
-        }
-      }
-
-      // Check for requirements.txt and install Python dependencies
-      const requirementsExists = await this.checkFileExists(
-        executor,
-        "requirements.txt"
-      );
-      if (requirementsExists) {
-        await this.runInstallCommand(
-          executor,
-          taskId,
-          "pip install -r requirements.txt"
-        );
-      }
-
-      // Check for pyproject.toml and install Python project
-      const pyprojectExists = await this.checkFileExists(
-        executor,
-        "pyproject.toml"
-      );
-      if (pyprojectExists) {
-        await this.runInstallCommand(executor, taskId, "pip install -e .");
-      }
-    } catch (error) {
-      console.error(
-        `[TASK_INIT] ${taskId}: Dependency installation failed:`,
-        error
-      );
-      // Don't throw error - we want to continue initialization even if deps fail
-    }
-  }
-
-  /**
-   * Helper method to check if a file exists in the workspace
-   */
-  private async checkFileExists(
-    executor: any,
-    filename: string
-  ): Promise<boolean> {
-    try {
-      const result = await executor.listDirectory(".");
-      return (
-        result.success &&
-        result.contents?.some(
-          (item: any) => item.name === filename && item.type === "file"
-        )
-      );
-    } catch (error) {
-      console.warn(`Failed to check for ${filename}:`, error);
-      return false;
-    }
-  }
-
-  /**
-   * Helper method to run installation commands with proper error handling
-   */
-  private async runInstallCommand(
-    executor: any,
-    taskId: string,
-    command: string
-  ): Promise<void> {
-    try {
-      const result = await executor.executeCommand(command, {
-        timeout: 300000, // 5 minutes timeout
-        allowNetworkAccess: true,
-      });
-
-      if (!result.success) {
-        console.warn(`[TASK_INIT] ${taskId}: Command failed: ${command}`);
-        console.warn(
-          `[TASK_INIT] ${taskId}: Error: ${result.error || result.stderr}`
-        );
-      }
-    } catch (error) {
-      console.warn(
-        `[TASK_INIT] ${taskId}: Exception running command "${command}":`,
-        error
-      );
-    }
-  }
-
-  /**
-   * Start background services step - Start Shadow Wiki generation and indexing in parallel
-   */
-  private async executeStartBackgroundServices(
-    taskId: string,
-    userId: string,
-    context: TaskModelContext
-  ): Promise<void> {
-    try {
-      // Get user settings to determine which services to start
-      const userSettings = await prisma.userSettings.findUnique({
-        where: { userId },
-        select: { enableShadowWiki: true, enableIndexing: true },
-      });
-
-      const enableShadowWiki = userSettings?.enableShadowWiki ?? true;
-      const enableIndexing = userSettings?.enableIndexing ?? false;
-
-      // Start background services using the manager
-      await this.backgroundServiceManager.startServices(
-        taskId,
-        { enableShadowWiki, enableIndexing },
-        context
-      );
-    } catch (error) {
-      console.error(
-        `[TASK_INIT] ${taskId}: Failed to start background services:`,
-        error
-      );
-      // Don't throw error - we want to continue initialization even if background services fail to start
-    }
-  }
-
-  /**
-   * Complete Shadow Wiki step - Wait for background services to complete
-   */
-  private async executeCompleteShadowWiki(taskId: string): Promise<void> {
-    try {
-      const maxWait = 10 * 60 * 1000; // 10 minutes max
-      const checkInterval = 2000; // Check every 2 seconds
-      const startTime = Date.now();
-
-      // Monitor progress and wait for completion
-      while (Date.now() - startTime < maxWait) {
-        // Check if all services are done
-        const allComplete =
-          this.backgroundServiceManager.areAllServicesComplete(taskId);
-
-        if (allComplete) {
-          break;
-        }
-
-        await delay(checkInterval);
-      }
-    } catch (error) {
-      console.error(
-        `[TASK_INIT] ${taskId}: Failed to complete Shadow Wiki:`,
-        error
-      );
-      // Don't throw error - we want to continue to ACTIVE even if background services had issues
     }
   }
 
@@ -754,7 +558,6 @@ export class TaskInitializationEngine {
 
   /**
    * Get default initialization steps based on agent mode
-   * Background services are now handled separately and run in parallel
    */
   async getDefaultStepsForTask(): Promise<InitStatus[]> {
     const agentMode = getAgentMode();

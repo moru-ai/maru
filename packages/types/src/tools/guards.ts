@@ -9,7 +9,6 @@ import type {
   DirectoryListing,
   FileSearchResult,
   GrepResult,
-  SemanticSearchToolResult,
   WebSearchResult,
   CommandResult,
   AddMemoryResult,
@@ -72,10 +71,6 @@ export function getToolResult(
   toolMeta: MessageMetadata["tool"] | undefined,
   toolName: "file_search"
 ): FileSearchResult | null;
-export function getToolResult(
-  toolMeta: MessageMetadata["tool"] | undefined,
-  toolName: "semantic_search"
-): SemanticSearchToolResult | null;
 export function getToolResult(
   toolMeta: MessageMetadata["tool"] | undefined,
   toolName: "web_search"
@@ -169,10 +164,6 @@ export function validateToolResult(
   result: unknown,
   toolName: "file_search"
 ): ValidationResult<FileSearchResult>;
-export function validateToolResult(
-  result: unknown,
-  toolName: "semantic_search"
-): ValidationResult<SemanticSearchToolResult>;
 export function validateToolResult(
   result: unknown,
   toolName: "web_search"

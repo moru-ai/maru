@@ -24,7 +24,6 @@ import {
   ReadFileOptions,
   WriteResult,
   SearchReplaceResult,
-  SemanticSearchToolResult,
   SearchOptions,
   GitStatusResponse,
   GitDiffResponse,
@@ -37,7 +36,6 @@ import {
   MAX_LINES_PER_READ,
 } from "@repo/types";
 import { CommandResult } from "../interfaces/types";
-import { performSemanticSearch } from "@/utils/semantic-search";
 
 /**
  * LocalToolExecutor implements tool operations for local filesystem execution
@@ -630,31 +628,6 @@ export class LocalToolExecutor implements ToolExecutor {
         detailedMatches: [],
         query,
         matchCount: 0,
-      };
-    }
-  }
-
-  async semanticSearch(
-    query: string,
-    repo: string,
-    _options?: SearchOptions
-  ): Promise<SemanticSearchToolResult> {
-    try {
-      return await performSemanticSearch({ query, repo });
-    } catch (error) {
-      console.error(
-        `[SEMANTIC_SEARCH_ERROR] Failed to query indexing service:`,
-        error
-      );
-
-      // Return error result
-      return {
-        success: false,
-        results: [],
-        query: query,
-        searchTerms: query.split(/\s+/).filter((term) => term.length > 0),
-        message: `Semantic search failed for "${query}"`,
-        error: error instanceof Error ? error.message : "Unknown error",
       };
     }
   }

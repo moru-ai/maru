@@ -8,10 +8,9 @@ import {
   GrepOptions,
   GrepResult,
   ReadFileOptions,
-  SearchOptions,
   WriteResult,
   SearchReplaceResult,
-  SemanticSearchToolResult,
+  SearchOptions,
   GitStatusResponse,
   GitDiffResponse,
   GitCommitResponse,
@@ -59,12 +58,6 @@ export interface ToolExecutor {
   ): Promise<FileSearchResult>;
 
   grepSearch(query: string, options?: GrepOptions): Promise<GrepResult>;
-
-  semanticSearch(
-    query: string,
-    repo: string,
-    options?: SearchOptions
-  ): Promise<SemanticSearchToolResult>;
 
   // Command execution
   executeCommand(

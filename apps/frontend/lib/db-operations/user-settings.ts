@@ -4,10 +4,8 @@ export interface UserSettings {
   id: string;
   userId: string;
   autoPullRequest: boolean;
-  enableShadowWiki: boolean;
   memoriesEnabled: boolean;
   selectedModels: string[];
-  enableIndexing: boolean;
   rules?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -27,10 +25,8 @@ export async function createUserSettings(
   userId: string,
   settings: {
     autoPullRequest: boolean;
-    enableShadowWiki?: boolean;
     memoriesEnabled?: boolean;
     selectedModels?: string[];
-    enableIndexing?: boolean;
     rules?: string;
   }
 ): Promise<UserSettings> {
@@ -38,10 +34,8 @@ export async function createUserSettings(
     data: {
       userId,
       autoPullRequest: settings.autoPullRequest,
-      enableShadowWiki: settings.enableShadowWiki ?? true,
       memoriesEnabled: settings.memoriesEnabled ?? true,
       selectedModels: settings.selectedModels ?? [],
-      enableIndexing: settings.enableIndexing ?? false,
       rules: settings.rules,
     },
   });
@@ -53,33 +47,25 @@ export async function updateUserSettings(
   userId: string,
   settings: {
     autoPullRequest?: boolean;
-    enableShadowWiki?: boolean;
     memoriesEnabled?: boolean;
     selectedModels?: string[];
-    enableIndexing?: boolean;
     rules?: string;
   }
 ): Promise<UserSettings> {
   try {
     const updateData: {
       autoPullRequest?: boolean;
-      enableShadowWiki?: boolean;
       memoriesEnabled?: boolean;
       selectedModels?: string[];
-      enableIndexing?: boolean;
       rules?: string;
     } = {};
 
     if (settings.autoPullRequest !== undefined)
       updateData.autoPullRequest = settings.autoPullRequest;
-    if (settings.enableShadowWiki !== undefined)
-      updateData.enableShadowWiki = settings.enableShadowWiki;
     if (settings.memoriesEnabled !== undefined)
       updateData.memoriesEnabled = settings.memoriesEnabled;
     if (settings.selectedModels !== undefined)
       updateData.selectedModels = settings.selectedModels;
-    if (settings.enableIndexing !== undefined)
-      updateData.enableIndexing = settings.enableIndexing;
     if (settings.rules !== undefined)
       updateData.rules = settings.rules;
 
@@ -87,10 +73,8 @@ export async function updateUserSettings(
     const createData: {
       userId: string;
       autoPullRequest?: boolean;
-      enableShadowWiki?: boolean;
       memoriesEnabled?: boolean;
       selectedModels?: string[];
-      enableIndexing?: boolean;
       rules?: string;
     } = {
       userId,
@@ -102,11 +86,6 @@ export async function updateUserSettings(
     )
       createData.autoPullRequest = settings.autoPullRequest;
     if (
-      settings.enableShadowWiki !== undefined &&
-      settings.enableShadowWiki !== true
-    )
-      createData.enableShadowWiki = settings.enableShadowWiki;
-    if (
       settings.memoriesEnabled !== undefined &&
       settings.memoriesEnabled !== true
     )
@@ -116,11 +95,6 @@ export async function updateUserSettings(
       settings.selectedModels.length > 0
     )
       createData.selectedModels = settings.selectedModels;
-    if (
-      settings.enableIndexing !== undefined &&
-      settings.enableIndexing !== false
-    )
-      createData.enableIndexing = settings.enableIndexing;
     if (settings.rules !== undefined)
       createData.rules = settings.rules;
 
@@ -145,10 +119,8 @@ export async function getOrCreateUserSettings(
   if (!settings) {
     settings = await createUserSettings(userId, {
       autoPullRequest: false,
-      enableShadowWiki: false,
       memoriesEnabled: true,
       selectedModels: [],
-      enableIndexing: false,
     });
   }
 

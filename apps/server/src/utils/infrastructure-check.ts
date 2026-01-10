@@ -1,7 +1,6 @@
 import { prisma } from "@repo/db";
 import { createToolExecutor, getAgentMode } from "../execution";
 import { TaskInitializationEngine } from "../initialization";
-import { TaskModelContext } from "../services/task-model-context";
 import { getStepsForMode } from "@repo/types";
 
 /**
@@ -10,8 +9,7 @@ import { getStepsForMode } from "@repo/types";
  */
 export async function ensureTaskInfrastructureExists(
   taskId: string,
-  userId: string,
-  context: TaskModelContext
+  userId: string
 ): Promise<void> {
   console.log(`[INFRA_CHECK] Checking infrastructure for task ${taskId}`);
 
@@ -42,7 +40,7 @@ export async function ensureTaskInfrastructureExists(
       console.log(
         `[INFRA_CHECK] ${taskId}: No active session found, re-initialization required`
       );
-      await triggerReinitialization(taskId, userId, context);
+      await triggerReinitialization(taskId, userId);
       return;
     }
 
@@ -56,7 +54,7 @@ export async function ensureTaskInfrastructureExists(
         console.log(
           `[INFRA_CHECK] ${taskId}: Pod unhealthy (health check failed), re-initialization required`
         );
-        await triggerReinitialization(taskId, userId, context);
+        await triggerReinitialization(taskId, userId);
         return;
       }
 
@@ -67,7 +65,7 @@ export async function ensureTaskInfrastructureExists(
       console.log(
         `[INFRA_CHECK] ${taskId}: Pod inaccessible (${error instanceof Error ? error.message : "Unknown error"}), re-initialization required`
       );
-      await triggerReinitialization(taskId, userId, context);
+      await triggerReinitialization(taskId, userId);
       return;
     }
   } catch (error) {
@@ -87,8 +85,7 @@ export async function ensureTaskInfrastructureExists(
  */
 async function triggerReinitialization(
   taskId: string,
-  userId: string,
-  context: TaskModelContext
+  userId: string
 ): Promise<void> {
   console.log(`[INFRA_CHECK] ${taskId}: Starting re-initialization`);
 
@@ -103,16 +100,14 @@ async function triggerReinitialization(
     },
   });
 
-  // Use TaskInitializationEngine with re-init optimized steps
+  // Use TaskInitializationEngine for re-initialization
   const initEngine = new TaskInitializationEngine();
 
-  // Get steps for current agent mode and filter out steps not critical for resumption
+  // Get steps for current agent mode
   const agentMode = getAgentMode();
-  const allSteps = getStepsForMode(agentMode);
-  const stepsToSkip = ["START_BACKGROUND_SERVICES", "COMPLETE_SHADOW_WIKI"];
-  const reinitSteps = allSteps.filter(step => !stepsToSkip.includes(step));
+  const steps = getStepsForMode(agentMode);
 
-  await initEngine.initializeTask(taskId, [...reinitSteps], userId, context);
+  await initEngine.initializeTask(taskId, steps, userId);
 
   console.log(
     `[INFRA_CHECK] ${taskId}: Re-initialization completed successfully`

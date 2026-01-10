@@ -132,12 +132,6 @@ export const DeleteFileParamsSchema = z
   })
   .merge(ExplanationSchema);
 
-export const SemanticSearchParamsSchema = z
-  .object({
-    query: z.string().describe("The query to search the codebase for"),
-  })
-  .merge(ExplanationSchema);
-
 export const WebSearchParamsSchema = z
   .object({
     query: z.string().describe("The search query"),
@@ -285,23 +279,6 @@ export const GrepResultSchema = BaseResultSchema.extend({
   matchCount: z.number(),
 });
 
-export const SemanticSearchResultSchema = BaseResultSchema.extend({
-  results: z.array(
-    z.object({
-      id: z.number(),
-      content: z.string(),
-      relevance: z.number(),
-      filePath: z.string(),
-      lineStart: z.number(),
-      lineEnd: z.number(),
-      language: z.string(),
-      kind: z.string(),
-    })
-  ),
-  query: z.string(),
-  searchTerms: z.array(z.string()),
-});
-
 export const WebSearchResultSchema = BaseResultSchema.extend({
   results: z.array(
     z.object({
@@ -382,7 +359,6 @@ export type ListDirParams = z.infer<typeof ListDirParamsSchema>;
 export type GrepSearchParams = z.infer<typeof GrepSearchParamsSchema>;
 export type FileSearchParams = z.infer<typeof FileSearchParamsSchema>;
 export type DeleteFileParams = z.infer<typeof DeleteFileParamsSchema>;
-export type SemanticSearchParams = z.infer<typeof SemanticSearchParamsSchema>;
 export type WebSearchParams = z.infer<typeof WebSearchParamsSchema>;
 export type AddMemoryParams = z.infer<typeof AddMemoryParamsSchema>;
 export type ListMemoriesParams = z.infer<typeof ListMemoriesParamsSchema>;
@@ -403,9 +379,6 @@ export type RecursiveDirectoryListing = z.infer<
 export type FileSearchResult = z.infer<typeof FileSearchResultSchema>;
 export type GrepMatch = z.infer<typeof GrepMatchSchema>;
 export type GrepResult = z.infer<typeof GrepResultSchema>;
-export type SemanticSearchToolResult = z.infer<
-  typeof SemanticSearchResultSchema
->;
 export type WebSearchResult = z.infer<typeof WebSearchResultSchema>;
 export type CommandResult = z.infer<typeof CommandResultSchema>;
 export type FileStatsResult = z.infer<typeof FileStatsResultSchema>;
@@ -423,7 +396,6 @@ export const ToolResultSchemas = {
   list_dir: DirectoryListingSchema,
   grep_search: GrepResultSchema,
   file_search: FileSearchResultSchema,
-  semantic_search: SemanticSearchResultSchema,
   web_search: WebSearchResultSchema,
   delete_file: DeleteResultSchema,
   add_memory: AddMemoryResultSchema,
@@ -443,7 +415,6 @@ export type ToolResultTypes =
   | { toolName: "list_dir"; result: DirectoryListing }
   | { toolName: "grep_search"; result: GrepResult }
   | { toolName: "file_search"; result: FileSearchResult }
-  | { toolName: "semantic_search"; result: SemanticSearchToolResult }
   | { toolName: "web_search"; result: WebSearchResult }
   | { toolName: "delete_file"; result: DeleteResult }
   | { toolName: "add_memory"; result: AddMemoryResult }
@@ -459,7 +430,6 @@ export enum ToolTypes {
   EDIT_FILE = "edit_file",
   READ_FILE = "read_file",
   SEARCH_REPLACE = "search_replace",
-  SEMANTIC_SEARCH = "semantic_search",
   GREP_SEARCH = "grep_search",
   FILE_SEARCH = "file_search",
   LIST_DIR = "list_dir",
@@ -480,7 +450,6 @@ export const TOOL_PREFIXES: Record<ToolTypes, string> = {
   [ToolTypes.EDIT_FILE]: "Edit",
   [ToolTypes.READ_FILE]: "Read",
   [ToolTypes.SEARCH_REPLACE]: "Replace in",
-  [ToolTypes.SEMANTIC_SEARCH]: "Semantic search",
   [ToolTypes.GREP_SEARCH]: "Grep",
   [ToolTypes.FILE_SEARCH]: "Search files",
   [ToolTypes.LIST_DIR]: "List",

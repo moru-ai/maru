@@ -12,7 +12,7 @@ export const STEP_DISPLAY_NAMES: Record<InitStatus, string> = {
   VERIFY_VM_WORKSPACE: "Verifying Workspace",
   START_BACKGROUND_SERVICES: "Starting Background Services",
   INSTALL_DEPENDENCIES: "Installing Dependencies",
-  COMPLETE_SHADOW_WIKI: "Complete Shadow Wiki",
+  COMPLETE_SHADOW_WIKI: "Completing Setup", // Kept for backward compatibility
   ACTIVE: "Active",
   // Moru sandbox mode steps
   CREATE_SANDBOX: "Creating Sandbox",
@@ -21,15 +21,9 @@ export const STEP_DISPLAY_NAMES: Record<InitStatus, string> = {
 };
 
 /**
- * Get the display name for a step based on user settings
+ * Get the display name for a step
  */
-export function getStepDisplayName(
-  step: InitStatus,
-  userSettings?: { enableShadowWiki?: boolean }
-): string {
-  if (step === "COMPLETE_SHADOW_WIKI" && userSettings?.enableShadowWiki === false) {
-    return "Completing Setup";
-  }
+export function getStepDisplayName(step: InitStatus): string {
   return STEP_DISPLAY_NAMES[step] ?? step;
 }
 
@@ -38,31 +32,13 @@ export function getStepDisplayName(
  */
 export function getStepsForMode(mode: AgentMode): InitStatus[] {
   const steps: InitStatus[] = [];
-  // Background services are enabled by default and run in parallel
 
   if (mode === "moru") {
-    steps.push(
-      "CREATE_SANDBOX",
-      "START_BACKGROUND_SERVICES",
-      "INSTALL_DEPENDENCIES",
-      "COMPLETE_SHADOW_WIKI"
-    );
+    steps.push("CREATE_SANDBOX");
   } else if (mode === "remote") {
-    steps.push(
-      "CREATE_VM",
-      "WAIT_VM_READY",
-      "VERIFY_VM_WORKSPACE",
-      "START_BACKGROUND_SERVICES",
-      "INSTALL_DEPENDENCIES",
-      "COMPLETE_SHADOW_WIKI"
-    );
+    steps.push("CREATE_VM", "WAIT_VM_READY", "VERIFY_VM_WORKSPACE");
   } else {
-    steps.push(
-      "PREPARE_WORKSPACE",
-      "START_BACKGROUND_SERVICES",
-      "INSTALL_DEPENDENCIES",
-      "COMPLETE_SHADOW_WIKI"
-    );
+    steps.push("PREPARE_WORKSPACE");
   }
 
   return steps;

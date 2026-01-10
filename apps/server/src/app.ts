@@ -1,4 +1,3 @@
-import { router as IndexingRouter } from "@/indexing/index";
 import { prisma } from "@repo/db";
 import { AvailableModels, ModelType } from "@repo/types";
 import cors from "cors";
@@ -17,7 +16,6 @@ import { hasReachedTaskLimit } from "./services/task-limit";
 import { createWorkspaceManager } from "./execution";
 import { filesRouter } from "./files/router";
 import { handleGitHubWebhook } from "./webhooks/github-webhook";
-import { getIndexingStatus } from "./routes/indexing-status";
 import { modelContextService } from "./services/model-context-service";
 
 const app = express();
@@ -70,27 +68,11 @@ app.get("/health", (_req, res) => {
     .json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
-// Indexing routes
-app.use("/api/indexing", IndexingRouter);
-
 // Files routes
 app.use("/api/tasks", filesRouter);
 
 // GitHub webhook endpoint
 app.post("/api/webhooks/github/pull-request", handleGitHubWebhook);
-
-// Indexing status endpoint
-app.get("/api/indexing-status/:repoFullName", async (req, res) => {
-  try {
-    const { repoFullName } = req.params;
-    const decodedRepoFullName = decodeURIComponent(repoFullName);
-    const status = await getIndexingStatus(decodedRepoFullName);
-    res.json(status);
-  } catch (error) {
-    console.error("Error fetching indexing status:", error);
-    res.status(500).json({ error: "Failed to fetch indexing status" });
-  }
-});
 
 // Get task details
 app.get("/api/tasks/:taskId", async (req, res) => {
@@ -203,12 +185,7 @@ app.post("/api/tasks/:taskId/initiate", async (req, res) => {
       );
 
       const initSteps = await initializationEngine.getDefaultStepsForTask();
-      await initializationEngine.initializeTask(
-        taskId,
-        initSteps,
-        userId,
-        initContext
-      );
+      await initializationEngine.initializeTask(taskId, initSteps, userId);
 
       const updatedTask = await prisma.task.findUnique({
         where: { id: taskId },
