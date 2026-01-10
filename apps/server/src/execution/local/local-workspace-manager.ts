@@ -1,7 +1,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import config from "../../config";
-import { RepositoryService } from "../../github/repositories";
 import { execAsync } from "../../utils/exec";
 import { WorkspaceManager } from "../interfaces/workspace-manager";
 import { ToolExecutor } from "../interfaces/tool-executor";
@@ -12,18 +11,14 @@ import {
   TaskConfig,
 } from "../interfaces/types";
 import { LocalToolExecutor } from "./local-tool-executor";
-import { GitManager } from "../../services/git-manager";
-import { prisma } from "@repo/db";
 import logger from "@/indexing/logger";
 
 /**
  * LocalWorkspaceManager implements workspace management for local filesystem execution
  */
 export class LocalWorkspaceManager implements WorkspaceManager {
-  private repositoryService: RepositoryService;
-
   constructor() {
-    this.repositoryService = new RepositoryService();
+    // No external dependencies required
   }
 
   /**
@@ -78,13 +73,7 @@ export class LocalWorkspaceManager implements WorkspaceManager {
   }
 
   async prepareWorkspace(taskConfig: TaskConfig): Promise<WorkspaceInfo> {
-    const {
-      id: taskId,
-      repoFullName,
-      baseBranch,
-      shadowBranch,
-      userId,
-    } = taskConfig;
+    const { id: taskId } = taskConfig;
     const workspacePath = this.getTaskWorkspaceDir(taskId);
 
     try {
@@ -95,58 +84,6 @@ export class LocalWorkspaceManager implements WorkspaceManager {
       // Ensure workspace directory exists and is clean
       await this.ensureWorkspaceExists(workspacePath);
 
-      // Clone the repository
-      const cloneResult = await this.repositoryService.cloneRepository(
-        repoFullName,
-        baseBranch,
-        workspacePath,
-        userId
-      );
-
-      if (!cloneResult.success) {
-        return {
-          success: false,
-          workspacePath,
-          cloneResult,
-          error: cloneResult.error,
-        };
-      }
-
-      // Verify the clone was successful by checking for .git directory
-      try {
-        const gitDir = path.join(workspacePath, ".git");
-        await fs.access(gitDir);
-      } catch (_error) {
-        return {
-          success: false,
-          workspacePath,
-          cloneResult,
-          error: "Clone completed but .git directory not found",
-        };
-      }
-
-      // Set up git configuration and create shadow branch
-      try {
-        await this.setupGitForTask(
-          taskId,
-          workspacePath,
-          baseBranch,
-          shadowBranch,
-          userId
-        );
-      } catch (error) {
-        console.error(
-          `[LOCAL_WORKSPACE] Failed to setup git for task ${taskId}:`,
-          error
-        );
-        return {
-          success: false,
-          workspacePath,
-          cloneResult,
-          error: `Git setup failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-        };
-      }
-
       console.log(
         `[LOCAL_WORKSPACE] Successfully prepared workspace for task ${taskId}`
       );
@@ -154,7 +91,6 @@ export class LocalWorkspaceManager implements WorkspaceManager {
       return {
         success: true,
         workspacePath,
-        cloneResult,
       };
     } catch (error) {
       console.error(
@@ -168,63 +104,6 @@ export class LocalWorkspaceManager implements WorkspaceManager {
         error:
           error instanceof Error ? error.message : "Unknown workspace error",
       };
-    }
-  }
-
-  /**
-   * Setup git configuration and create shadow branch for the task
-   */
-  private async setupGitForTask(
-    taskId: string,
-    workspacePath: string,
-    baseBranch: string,
-    shadowBranch: string,
-    userId: string
-  ): Promise<void> {
-    const gitManager = new GitManager(workspacePath);
-
-    try {
-      // Get user information from database
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { name: true, email: true },
-      });
-
-      if (!user) {
-        throw new Error(`User not found: ${userId}`);
-      }
-
-      // Configure git user as Shadow (Shadow will be the author, user will be co-author)
-      await gitManager.configureGitUser({
-        name: "Shadow",
-        email: "noreply@shadowrealm.ai",
-      });
-
-      // Create and checkout shadow branch, get the base commit SHA
-      const baseCommitSha = await gitManager.createShadowBranch(
-        baseBranch,
-        shadowBranch
-      );
-
-      // Update task in database with base commit SHA
-      await prisma.task.update({
-        where: { id: taskId },
-        data: {
-          baseCommitSha,
-        },
-      });
-
-      console.log(`[LOCAL_WORKSPACE] Git setup complete for task ${taskId}:`, {
-        baseBranch,
-        shadowBranch,
-        baseCommitSha,
-      });
-    } catch (error) {
-      console.error(
-        `[LOCAL_WORKSPACE] Git setup failed for task ${taskId}:`,
-        error
-      );
-      throw error;
     }
   }
 

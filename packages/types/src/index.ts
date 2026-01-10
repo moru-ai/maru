@@ -51,6 +51,7 @@ export * from "./mcp/types";
 
 // === Claude Code Session Types ===
 export * as ClaudeCode from "./claude-code";
+export type { SessionEntry } from "./claude-code/session";
 
 // === Agent Protocol Types ===
 export * as AgentProtocol from "./agent-protocol";

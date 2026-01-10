@@ -8,14 +8,18 @@
 /**
  * Messages sent from server to agent via stdin
  */
-export type ServerToAgentMessage = StartCommand | MessageCommand | InterruptCommand | StopCommand;
+export type ServerToAgentMessage =
+  | ProcessStartCommand
+  | SessionMessageCommand
+  | SessionInterruptCommand
+  | ProcessStopCommand;
 export type ContentBlock = TextContent | ImageContent;
 
 /**
- * Start a new session or resume an existing one
+ * Start the agent process and create/resume a session
  */
-export interface StartCommand {
-  type: "start";
+export interface ProcessStartCommand {
+  type: "process_start";
   /**
    * Session ID to resume, omit for new session
    */
@@ -25,9 +29,11 @@ export interface StartCommand {
    */
   fork?: boolean;
 }
-export interface MessageCommand {
-  type: "message";
-  id: string;
+/**
+ * Send a message to Claude
+ */
+export interface SessionMessageCommand {
+  type: "session_message";
   text?: string;
   content?: ContentBlock[];
 }
@@ -44,9 +50,15 @@ export interface ImageSource {
   media_type: string;
   data: string;
 }
-export interface InterruptCommand {
-  type: "interrupt";
+/**
+ * Interrupt the current message processing
+ */
+export interface SessionInterruptCommand {
+  type: "session_interrupt";
 }
-export interface StopCommand {
-  type: "stop";
+/**
+ * Stop the agent process
+ */
+export interface ProcessStopCommand {
+  type: "process_stop";
 }

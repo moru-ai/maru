@@ -43,8 +43,6 @@ export function getStepsForMode(mode: AgentMode): InitStatus[] {
   if (mode === "moru") {
     steps.push(
       "CREATE_SANDBOX",
-      "CLONE_REPOSITORY",
-      "SETUP_GIT",
       "START_BACKGROUND_SERVICES",
       "INSTALL_DEPENDENCIES",
       "COMPLETE_SHADOW_WIKI"

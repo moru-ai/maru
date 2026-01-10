@@ -79,10 +79,10 @@ model Task {
   title  String
   status TaskStatus @default(INITIALIZING)
 
-  // Repo full name "owner/repo"
-  repoFullName String
-  // Repo URL "https://github.com/owner/repo"
-  repoUrl      String
+  // Repo full name "owner/repo" (optional - not required for non-git workspaces)
+  repoFullName String?
+  // Repo URL "https://github.com/owner/repo" (optional)
+  repoUrl      String?
 
   // User's selected LLM model for this task - updated on each user message
   // Used for context-aware operations (commits, PR generation, etc.)
@@ -97,9 +97,9 @@ model Task {
   createdAt                   DateTime      @default(now())
   updatedAt                   DateTime      @updatedAt
   userId                      String
-  baseBranch                  String
-  baseCommitSha               String
-  shadowBranch                String
+  baseBranch                  String?
+  baseCommitSha               String?
+  shadowBranch                String?
   pullRequestNumber           Int?
   githubIssueId               String?
   messages                    ChatMessage[] @relation("TaskMessages")
@@ -201,9 +201,9 @@ model Memory {
   content  String
   category MemoryCategory
 
-  // Repository-specific memories only
-  repoFullName String
-  repoUrl      String
+  // Repository-specific memories (optional - not required for non-git workspaces)
+  repoFullName String?
+  repoUrl      String?
 
   // User and task context
   userId String
@@ -279,8 +279,8 @@ enum InitStatus {
   ACTIVE
   // Moru sandbox mode steps
   CREATE_SANDBOX
-  CLONE_REPOSITORY
-  SETUP_GIT
+  CLONE_REPOSITORY  // @deprecated - kept for backward compatibility
+  SETUP_GIT         // @deprecated - kept for backward compatibility
 }
 
 model UserSettings {

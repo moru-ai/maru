@@ -10,12 +10,9 @@ import { cn } from "@/lib/utils";
 import {
   CircleDashed,
   FileDiff,
-  Folder,
   FolderGit2,
-  GitBranch,
   BookOpen,
   ListTodo,
-  RefreshCcw,
   Square,
   SquareCheck,
   SquareX,
@@ -33,25 +30,6 @@ import { GithubLogo } from "../graphics/github/github-logo";
 import { useCreatePR } from "@/hooks/chat/use-create-pr";
 import { useTaskSocketContext } from "@/contexts/task-socket-context";
 import { Loader2 } from "lucide-react";
-import { useIndexingStatus } from "@/hooks/use-indexing-status";
-import { useQueryClient } from "@tanstack/react-query";
-import { fetchIndexApi } from "@/lib/actions/index-repo";
-import { useUserSettings } from "@/hooks/use-user-settings";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import { toast } from "sonner";
 
 const todoStatusConfig = {
   PENDING: { icon: Square, className: "text-muted-foreground" },
@@ -119,14 +97,6 @@ export function SidebarAgentView({ taskId }: { taskId: string }) {
     useAgentEnvironment();
   const { isStreaming, autoPRStatus } = useTaskSocketContext();
   const createPRMutation = useCreatePR();
-  const queryClient = useQueryClient();
-
-  // Use indexing status hook for unified status tracking
-  const { data: indexingStatus } = useIndexingStatus(task?.repoFullName || "");
-  const { data: userSettings } = useUserSettings();
-
-  // Copy to clipboard functionality
-  const { copyToClipboard } = useCopyToClipboard();
 
   const completedTodos = useMemo(
     () => todos.filter((todo) => todo.status === "COMPLETED").length,
@@ -164,44 +134,6 @@ export function SidebarAgentView({ taskId }: { taskId: string }) {
     }
   }, [task?.id, createPRMutation]);
 
-  const handleIndexRepo = useCallback(async () => {
-    if (!task?.repoFullName || !task?.id) return;
-
-    // Optimistic update - immediately show "indexing" state
-    queryClient.setQueryData(["indexing-status", task.repoFullName], {
-      status: "indexing",
-      lastIndexedAt: null,
-      lastCommitSha: null,
-    });
-
-    try {
-      fetchIndexApi({
-        repoFullName: task.repoFullName,
-        taskId: task.id,
-        clearNamespace: true,
-      }).catch((error) => {
-        queryClient.invalidateQueries({
-          queryKey: ["indexing-status", task.repoFullName],
-        });
-        console.error("Indexing failed:", error);
-      });
-    } catch (error) {
-      queryClient.invalidateQueries({
-        queryKey: ["indexing-status", task.repoFullName],
-      });
-      console.error("Failed to start indexing:", error);
-    }
-  }, [task?.repoFullName, task?.id, queryClient]);
-
-  // Handler for copying branch name
-  const handleCopyBranchName = async (shadowBranch: string) => {
-    const success = await copyToClipboard(shadowBranch);
-    if (success) {
-      toast.success("Branch name copied to clipboard");
-    } else {
-      toast.error("Failed to copy branch name");
-    }
-  };
 
   // Determine if we should show create PR button
   const showCreatePR = !task?.pullRequestNumber && fileChanges.length > 0;
@@ -209,21 +141,12 @@ export function SidebarAgentView({ taskId }: { taskId: string }) {
   const isCreatePRDisabled =
     isStreaming || createPRMutation.isPending || isAutoPRInProgress;
 
-  // Indexing button state logic
-  const isIndexing = indexingStatus?.status === "indexing";
-  const isIndexingDisabled = isIndexing;
-
-  const getIndexingButtonText = () => {
-    if (isIndexing) return "Indexing...";
-    if (indexingStatus?.status === "completed") return "Re-Index Repo";
-    if (indexingStatus?.status === "failed") return "Retry Indexing";
-    return "Index Repo";
-  };
 
   return (
     <>
-      {/* PR buttons - show create or view based on state */}
-      {(task.pullRequestNumber || showCreatePR) &&
+      {/* PR buttons - show create or view based on state (only if task has a repo) */}
+      {task.repoUrl &&
+        (task.pullRequestNumber || showCreatePR) &&
         task.status !== "ARCHIVED" && (
           <SidebarGroup>
             <SidebarGroupContent className="flex flex-col gap-0.5">
@@ -275,95 +198,23 @@ export function SidebarAgentView({ taskId }: { taskId: string }) {
           </SidebarGroup>
         )}
 
-      <SidebarGroup>
-        <SidebarGroupContent className="flex flex-col gap-0.5">
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="hover:bg-sidebar-accent px-2! w-full justify-start font-normal"
-                >
-                  <Folder className="size-4 shrink-0" />
-                  <span className="truncate">{task.repoFullName}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="bg-sidebar-accent border-sidebar-border w-[var(--radix-dropdown-menu-trigger-width)]"
+      {/* Shadow Wiki - only show if codebase understanding exists */}
+      {task.codebaseUnderstandingId && (
+        <SidebarGroup>
+          <SidebarGroupContent className="flex flex-col gap-0.5">
+            <SidebarMenuItem>
+              <Button
+                variant="ghost"
+                className="hover:bg-sidebar-accent px-2! w-full justify-start font-normal"
+                onClick={() => openShadowWiki()}
               >
-                <DropdownMenuItem asChild>
-                  <Link
-                    href={`${task.repoUrl}`}
-                    target="_blank"
-                    className="hover:bg-sidebar-border!"
-                  >
-                    <GithubLogo className="text-foreground size-4 shrink-0" />
-                    <span>Open in GitHub</span>
-                  </Link>
-                </DropdownMenuItem>
-                {task.codebaseUnderstandingId && (
-                  <DropdownMenuItem
-                    className="hover:bg-sidebar-border!"
-                    onClick={() => openShadowWiki()}
-                  >
-                    <BookOpen className="text-foreground size-4 shrink-0" />
-                    <span>Shadow Wiki</span>
-                  </DropdownMenuItem>
-                )}
-                {userSettings?.enableIndexing && (
-                  <>
-                    <DropdownMenuSeparator className="bg-sidebar-border" />
-                    <DropdownMenuItem
-                      onClick={handleIndexRepo}
-                      disabled={isIndexingDisabled}
-                      className="hover:bg-sidebar-border!"
-                    >
-                      <RefreshCcw
-                        className={`text-foreground size-4 shrink-0 ${isIndexing ? "animate-spin" : ""}`}
-                      />
-                      <span>{getIndexingButtonText()}</span>
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-
-          <SidebarMenuItem>
-            <ContextMenu>
-              <ContextMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="hover:bg-sidebar-accent px-2! w-full justify-start font-normal"
-                  asChild
-                >
-                  <Link
-                    href={`${task.repoUrl}/tree/${task.shadowBranch}`}
-                    target="_blank"
-                  >
-                    <GitBranch className="size-4 shrink-0" />
-                    <span className="truncate">{task.shadowBranch}</span>
-                  </Link>
-                </Button>
-              </ContextMenuTrigger>
-              <ContextMenuContent className="bg-sidebar-accent border-sidebar-border">
-                <ContextMenuItem
-                  onClick={() => handleCopyBranchName(task.shadowBranch)}
-                  className="text-muted-foreground hover:text-foreground hover:bg-sidebar-border! h-7"
-                >
-                  <GitBranch className="size-3.5 text-inherit" />
-                  <span className="text-[13px]">Copy Branch Name</span>
-                </ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
-          </SidebarMenuItem>
-        </SidebarGroupContent>
-      </SidebarGroup>
-
-      <div className="px-3">
-        <div className="bg-border h-px w-full" />
-      </div>
+                <BookOpen className="size-4 shrink-0" />
+                <span className="truncate">Shadow Wiki</span>
+              </Button>
+            </SidebarMenuItem>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      )}
 
       <SidebarGroup>
         <SidebarGroupContent>

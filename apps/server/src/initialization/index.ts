@@ -175,7 +175,7 @@ export class TaskInitializationEngine {
 
   /**
    * Prepare workspace step - local mode only
-   * Creates local workspace directory and clones repository
+   * Creates local workspace directory
    */
   private async executePrepareWorkspace(
     taskId: string,
@@ -188,29 +188,10 @@ export class TaskInitializationEngine {
       );
     }
 
-    // Get task info
-    const task = await prisma.task.findUnique({
-      where: { id: taskId },
-      select: {
-        repoFullName: true,
-        repoUrl: true,
-        baseBranch: true,
-        shadowBranch: true,
-      },
-    });
-
-    if (!task) {
-      throw new Error(`Task ${taskId} not found`);
-    }
-
-    // Use workspace manager to prepare local workspace and clone repo
+    // Use workspace manager to prepare local workspace
     const workspaceResult =
       await this.abstractWorkspaceManager.prepareWorkspace({
         id: taskId,
-        repoFullName: task.repoFullName,
-        repoUrl: task.repoUrl,
-        baseBranch: task.baseBranch || "main",
-        shadowBranch: task.shadowBranch || `shadow/task-${taskId}`,
         userId,
       });
 

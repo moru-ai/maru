@@ -15,15 +15,6 @@ const createTaskSchema = z.object({
     .min(1, "Message is required")
     .max(100000, "Message too long"),
   model: z.string().min(1, "Model is required"),
-  repoFullName: z.string().min(1, "Repository name is required"),
-  repoUrl: z
-    .string()
-    .url("Invalid repository URL")
-    .refine(
-      (url) => url.includes("github.com"),
-      "Only GitHub repositories are supported"
-    ),
-  baseBranch: z.string().min(1, "Base branch is required").default("main"),
 });
 
 export async function createTask(formData: FormData) {
@@ -37,9 +28,6 @@ export async function createTask(formData: FormData) {
   const rawData = {
     message: formData.get("message") as string,
     model: formData.get("model") as string,
-    repoFullName: formData.get("repoFullName") as string,
-    repoUrl: formData.get("repoUrl") as string,
-    baseBranch: (formData.get("baseBranch") as string) || "main",
   };
   const validation = createTaskSchema.safeParse(rawData);
   if (!validation.success) {
@@ -49,7 +37,7 @@ export async function createTask(formData: FormData) {
     throw new Error(`Validation failed: ${errorMessage}`);
   }
 
-  const { message, model, repoUrl, baseBranch, repoFullName } = validation.data;
+  const { message, model } = validation.data;
 
   // Check task limit in production only
   if (process.env.NODE_ENV === "production") {
@@ -72,21 +60,13 @@ export async function createTask(formData: FormData) {
 
   try {
     // Generate a title for the task
-    const { title, shadowBranch } = await generateTaskTitleAndBranch(
-      taskId,
-      message
-    );
+    const { title } = await generateTaskTitleAndBranch(taskId, message);
 
     // Create the task
     task = await prisma.task.create({
       data: {
         id: taskId,
         title,
-        repoFullName,
-        repoUrl,
-        baseBranch,
-        shadowBranch,
-        baseCommitSha: "pending",
         status: "INITIALIZING",
         user: {
           connect: {

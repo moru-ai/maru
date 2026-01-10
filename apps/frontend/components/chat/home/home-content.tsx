@@ -5,7 +5,6 @@ import { LogoHover } from "../../graphics/logo/logo-hover";
 import { PromptForm } from "../prompt-form/prompt-form";
 import { WelcomeModal } from "../../welcome-modal";
 import { useAuthSession } from "../../auth/session-provider";
-import type { FilteredRepository } from "@/lib/github/types";
 import type { ModelType } from "@repo/types";
 
 const WELCOME_MODAL_SHOWN_KEY = "shadow-welcome-modal-shown";
@@ -13,13 +12,8 @@ const WELCOME_MODAL_COMPLETED_KEY = "shadow-welcome-modal-completed";
 const WELCOME_MODAL_DELAY = 300;
 
 export function HomePageContent({
-  initialGitCookieState,
   initialSelectedModel,
 }: {
-  initialGitCookieState?: {
-    repo: FilteredRepository | null;
-    branch: { name: string; commitSha: string } | null;
-  } | null;
   initialSelectedModel?: ModelType | null;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -63,7 +57,6 @@ export function HomePageContent({
       </div>
       <PromptForm
         isHome
-        initialGitCookieState={initialGitCookieState}
         initialSelectedModel={initialSelectedModel}
         transition={{ isPending, startTransition }}
       />

@@ -29,14 +29,9 @@ import {
   TransitionStartFunction,
 } from "react";
 import { toast } from "sonner";
-import { GithubConnection } from "./github";
-import { RepoIssues } from "../home/repo-issues";
-import type { GitHubIssue } from "@repo/types";
-import type { FilteredRepository as Repository } from "@/lib/github/types";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
 import { QueuedAction } from "../messages/queued-message";
 import { ModelSelector } from "./model-selector";
-import { generateIssuePrompt } from "@/lib/github/issue-prompt";
 import { useSelectedModel } from "@/hooks/chat/use-selected-model";
 
 export function PromptForm({
@@ -47,7 +42,6 @@ export function PromptForm({
   isHome = false,
   onFocus,
   onBlur,
-  initialGitCookieState,
   initialSelectedModel,
   isInitializing = false,
   transition,
@@ -63,10 +57,6 @@ export function PromptForm({
   isHome?: boolean;
   onFocus?: () => void;
   onBlur?: () => void;
-  initialGitCookieState?: {
-    repo: Repository | null;
-    branch: { name: string; commitSha: string } | null;
-  } | null;
   initialSelectedModel?: ModelType | null;
   isInitializing?: boolean;
   transition?: {
@@ -90,14 +80,6 @@ export function PromptForm({
     }
   }, [isHome, querySelectedModel]);
 
-  const [repo, setRepo] = useState<Repository | null>(
-    initialGitCookieState?.repo || null
-  );
-  const [branch, setBranch] = useState<{
-    name: string;
-    commitSha: string;
-  } | null>(initialGitCookieState?.branch || null);
-
   const handleSelectModel = useCallback(
     async (model: ModelType | null) => {
       setSelectedModel(model);
@@ -116,7 +98,6 @@ export function PromptForm({
   const queryClient = useQueryClient();
 
   const [isMessageOptionsOpen, setIsMessageOptionsOpen] = useState(false);
-  const [isGithubConnectionOpen, setIsGithubConnectionOpen] = useState(false);
 
   const messageOptions = useMemo(() => {
     const queueAction = () => {
@@ -256,19 +237,13 @@ export function PromptForm({
     (e: React.FormEvent) => {
       e.preventDefault();
 
-      if (!repo || !branch || !message.trim() || !selectedModel || isPending) {
+      if (!message.trim() || !selectedModel || isPending) {
         return;
       }
-
-      const completeRepoUrl = `https://github.com/${repo.full_name}`;
 
       const formData = new FormData();
       formData.append("message", message);
       formData.append("model", selectedModel);
-      formData.append("repoUrl", completeRepoUrl);
-      formData.append("repoFullName", repo.full_name);
-      formData.append("baseBranch", branch.name);
-      formData.append("baseCommitSha", branch.commitSha);
 
       startTransition?.(async () => {
         let taskId: string | null = null;
@@ -298,7 +273,7 @@ export function PromptForm({
         }
       });
     },
-    [repo, branch, message, selectedModel, queryClient]
+    [message, selectedModel, queryClient, isPending, startTransition]
   );
 
   // Submission handling for home page
@@ -338,13 +313,6 @@ export function PromptForm({
   // Keyboard shortcuts, including submission handling for task page
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
-      // Handle Cmd+/ shortcut to toggle GitHub connection (only on home page)
-      if (event.key === "/" && event.metaKey && isHome) {
-        event.preventDefault();
-        setIsGithubConnectionOpen((prev) => !prev);
-        return;
-      }
-
       // For home page, enter handled by handleSubmit
       if (isHome) return;
 
@@ -399,58 +367,7 @@ export function PromptForm({
     messageOptions,
     isStreaming,
     handleOpenMessageOptions,
-    isGithubConnectionOpen,
   ]);
-
-  const handleCreateTaskForIssue = (issue: GitHubIssue) => {
-    if (!repo || !branch || isPending) {
-      return;
-    }
-
-    if (!selectedModel) {
-      toast.error("Please select a model first");
-      return;
-    }
-
-    const completeRepoUrl = `https://github.com/${repo.full_name}`;
-    const issuePrompt = generateIssuePrompt(issue);
-
-    const formData = new FormData();
-    formData.append("message", issuePrompt);
-    formData.append("model", selectedModel);
-    formData.append("repoUrl", completeRepoUrl);
-    formData.append("repoFullName", repo.full_name);
-    formData.append("baseBranch", branch.name);
-    formData.append("baseCommitSha", branch.commitSha);
-
-    startTransition?.(async () => {
-      let taskId: string | null = null;
-      try {
-        taskId = await createTask(formData);
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-
-        // Show specific toast for task limit errors
-        if (
-          errorMessage.includes("maximum of") &&
-          errorMessage.includes("active tasks")
-        ) {
-          toast.error("Task limit reached", {
-            description: errorMessage,
-          });
-        } else {
-          toast.error("Failed to create task", {
-            description: errorMessage,
-          });
-        }
-      }
-      if (taskId) {
-        queryClient.invalidateQueries({ queryKey: ["tasks"] });
-        redirect(`/tasks/${taskId}`);
-      }
-    });
-  };
 
   const isSubmitButtonDisabled = useMemo(
     () =>
@@ -458,18 +375,14 @@ export function PromptForm({
       isPending ||
       !selectedModel ||
       isInitializing ||
-      (isHome
-        ? !repo || !branch || !message.trim()
-        : !isStreaming && !message.trim()),
+      (isHome ? !message.trim() : !isStreaming && !message.trim()),
     [
       isMessageOptionsOpen,
       isPending,
       selectedModel,
       isInitializing,
       isHome,
-      repo,
-      branch,
-      message.trim(),
+      message,
       isStreaming,
     ]
   );
@@ -604,16 +517,6 @@ export function PromptForm({
               />
 
               <div className="flex items-center gap-2 overflow-hidden">
-                {isHome && (
-                  <GithubConnection
-                    isOpen={isGithubConnectionOpen}
-                    setIsOpen={setIsGithubConnectionOpen}
-                    selectedRepo={repo}
-                    selectedBranch={branch}
-                    setSelectedRepo={setRepo}
-                    setSelectedBranch={setBranch}
-                  />
-                )}
                 <div className="flex items-center gap-2">
                   <Button
                     type="submit"
@@ -637,15 +540,6 @@ export function PromptForm({
           </div>
         </div>
       </form>
-
-      {/* Github issues: only show on home page when repo is selected */}
-      {isHome && repo && branch && (
-        <RepoIssues
-          repository={repo}
-          isPending={isPending ?? false}
-          handleSubmit={handleCreateTaskForIssue}
-        />
-      )}
     </>
   );
 }

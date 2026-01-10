@@ -8,22 +8,53 @@
 /**
  * Messages sent from agent to server via stdout
  */
-export type AgentToServerMessage = ReadyEvent | AckEvent | CompleteEvent | InterruptedEvent | ErrorEvent | DoneEvent;
+export type AgentToServerMessage =
+  | ProcessReadyEvent
+  | ProcessErrorEvent
+  | ProcessStoppedEvent
+  | SessionStartedEvent
+  | SessionCompleteEvent
+  | SessionInterruptedEvent
+  | SessionErrorEvent;
 
-export interface ReadyEvent {
-  type: "ready";
+/**
+ * Agent process started and session is ready
+ */
+export interface ProcessReadyEvent {
+  type: "process_ready";
   workspace: string;
   session_id: string;
   resumed?: boolean;
   forked?: boolean;
 }
-export interface AckEvent {
-  type: "ack";
-  id: string;
+/**
+ * Fatal error, process is stopping
+ */
+export interface ProcessErrorEvent {
+  type: "process_error";
+  message: string;
+  code?: string;
 }
-export interface CompleteEvent {
-  type: "complete";
-  id: string;
+/**
+ * Agent process is stopping
+ */
+export interface ProcessStoppedEvent {
+  type: "process_stopped";
+  reason: "stop" | "error" | "eof";
+}
+/**
+ * Message received, processing started
+ */
+export interface SessionStartedEvent {
+  type: "session_started";
+  session_id: string;
+}
+/**
+ * Claude finished responding to the message
+ */
+export interface SessionCompleteEvent {
+  type: "session_complete";
+  session_id: string;
   result?: ResultData;
 }
 export interface ResultData {
@@ -32,17 +63,19 @@ export interface ResultData {
   total_cost_usd?: number | null;
   num_turns?: number;
 }
-export interface InterruptedEvent {
-  type: "interrupted";
-  id: string;
+/**
+ * Message processing was interrupted
+ */
+export interface SessionInterruptedEvent {
+  type: "session_interrupted";
+  session_id: string;
 }
-export interface ErrorEvent {
-  type: "error";
+/**
+ * Error during message processing
+ */
+export interface SessionErrorEvent {
+  type: "session_error";
   id?: string | null;
   message: string;
   code?: string;
-}
-export interface DoneEvent {
-  type: "done";
-  reason: "stop" | "error" | "eof";
 }
