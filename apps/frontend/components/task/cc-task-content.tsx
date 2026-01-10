@@ -133,10 +133,11 @@ function CCTaskPageContent() {
         {hasContent ? (
           <CCMessages entries={entries} />
         ) : entriesLoading ? (
-          <div className='flex items-center justify-center py-12'>
-            <div className='text-muted-foreground text-sm'>
-              Loading session...
+          <div className='relative w-full rounded-lg p-px user-message-border'>
+            <div className='shimmer-skeleton relative z-0 w-full overflow-clip rounded-lg px-3 py-2'>
+              <div className='h-5 w-full' />
             </div>
+            <div className='bg-background absolute inset-px -z-10 rounded-[calc(var(--radius)+1px)]' />
           </div>
         ) : task?.status === 'RUNNING' ? (
           <div className='shimmer flex h-7 w-fit items-center px-3 text-[13px]'>

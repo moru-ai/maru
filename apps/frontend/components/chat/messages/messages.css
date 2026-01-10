@@ -104,3 +104,14 @@
     background-position: -200% 0;
   }
 }
+
+.shimmer-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--border) 25%,
+    color-mix(in oklch, var(--border), var(--foreground) 20%) 50%,
+    var(--border) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
