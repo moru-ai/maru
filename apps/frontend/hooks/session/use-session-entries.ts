@@ -116,6 +116,40 @@ export function useSessionEntries(
         seenUuidsRef.current.add(uuid);
       }
 
+      // When a real user message arrives from server (UUID doesn't start with 'pending-'),
+      // replace any optimistic pending entry in-place to prevent duplicates and preserve order.
+      // This handles the case where we added an optimistic entry with pending-xxx UUID,
+      // then the server sends back the real entry with a different UUID.
+      if (entry.type === 'user' && uuid && !uuid.startsWith('pending-')) {
+        queryClient.setQueryData<SessionEntry[]>(
+          ['session-entries', taskId],
+          (old = []) => {
+            // Find the pending entry to replace in-place
+            const pendingIndex = old.findIndex(e => {
+              if (e.type !== 'user') return false;
+              const eUuid =
+                'uuid' in e && typeof e.uuid === 'string' ? e.uuid : null;
+              return eUuid?.startsWith('pending-');
+            });
+
+            if (pendingIndex !== -1) {
+              // Replace in-place to preserve order
+              const pendingUuid = (old[pendingIndex] as any).uuid;
+              if (pendingUuid) {
+                seenUuidsRef.current.delete(pendingUuid);
+              }
+              const newEntries = [...old];
+              newEntries[pendingIndex] = entry;
+              return newEntries;
+            }
+
+            // No pending entry found, just append
+            return [...old, entry];
+          }
+        );
+        return;
+      }
+
       queryClient.setQueryData<SessionEntry[]>(
         ['session-entries', taskId],
         (old = []) => [...old, entry]
@@ -142,9 +176,45 @@ export function useSessionEntries(
 
       if (uniqueNew.length === 0) return;
 
+      // Find real user messages in the batch (not pending)
+      const realUserMessages = uniqueNew.filter(
+        entry =>
+          entry.type === 'user' &&
+          'uuid' in entry &&
+          typeof entry.uuid === 'string' &&
+          !entry.uuid.startsWith('pending-')
+      );
+
       queryClient.setQueryData<SessionEntry[]>(
         ['session-entries', taskId],
-        (old = []) => [...old, ...uniqueNew]
+        (old = []) => {
+          let result = [...old];
+
+          // For each real user message, replace any pending entry in-place
+          for (const realEntry of realUserMessages) {
+            const pendingIndex = result.findIndex(e => {
+              if (e.type !== 'user') return false;
+              const eUuid =
+                'uuid' in e && typeof e.uuid === 'string' ? e.uuid : null;
+              return eUuid?.startsWith('pending-');
+            });
+
+            if (pendingIndex !== -1) {
+              // Replace in-place to preserve order
+              const pendingUuid = (result[pendingIndex] as any).uuid;
+              if (pendingUuid) {
+                seenUuidsRef.current.delete(pendingUuid);
+              }
+              result[pendingIndex] = realEntry;
+            } else {
+              // No pending entry, will be added with other new entries
+            }
+          }
+
+          // Append entries that aren't already in result (weren't used to replace pending)
+          const toAppend = uniqueNew.filter(e => !result.includes(e));
+          return [...result, ...toAppend];
+        }
       );
     },
     [queryClient, taskId]
