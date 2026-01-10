@@ -60,6 +60,7 @@ export async function sendMessage(
   // Restore session JSONL if resuming
   if (sessionId) {
     linesRead = await restoreSession(taskId, sessionId, sandbox);
+    console.log(`[AGENT_SESSION] Resuming session ${sessionId} (${linesRead} entries restored)`);
   }
 
   // Closure state
@@ -83,7 +84,9 @@ export async function sendMessage(
         if (!line.trim()) continue;
         try {
           handleMessage(JSON.parse(line));
-        } catch {}
+        } catch (err) {
+          console.error(`[AGENT_SESSION] Failed to parse agent output:`, err);
+        }
       }
     },
   });
@@ -91,7 +94,9 @@ export async function sendMessage(
   function handleMessage(msg: Record<string, unknown>) {
     if (msg.type === "session_started") {
       sessionId = msg.session_id as string;
-      prisma.task.update({ where: { id: taskId }, data: { sessionId } });
+      // Save sessionId to database - must handle promise to avoid silent failures
+      prisma.task.update({ where: { id: taskId }, data: { sessionId } })
+        .catch((err) => console.error(`[AGENT_SESSION] Failed to save sessionId:`, err));
       emitToTask(taskId, "session-started", { taskId, sessionId });
 
       // Start polling with setTimeout (sequential, no race)
