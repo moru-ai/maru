@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useCallback, useState, useMemo, useRef } from "react";
-import { useSocket } from "../socket/use-socket";
-import type { SessionEntry } from "@repo/types";
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useCallback, useState, useMemo, useRef } from 'react';
+import { useSocket } from '../socket/use-socket';
+import type { SessionEntry } from '@repo/types';
 
 /**
  * Fetch session entries from API
@@ -11,7 +11,7 @@ import type { SessionEntry } from "@repo/types";
 async function fetchSessionEntries(taskId: string): Promise<SessionEntry[]> {
   const res = await fetch(`/api/tasks/${taskId}/session-entries`);
   if (!res.ok) {
-    throw new Error("Failed to fetch session entries");
+    throw new Error('Failed to fetch session entries');
   }
   return res.json();
 }
@@ -24,7 +24,10 @@ interface UseSessionEntriesOptions {
  * Hook to manage session entries from Claude Agent SDK
  * - Fetches initial entries from database
  * - Listens for real-time session-entry events via socket
- * - Maintains sorted list of entries by timestamp
+ * - Performs minimal filtering (UUID dedup, type filtering)
+ *
+ * Note: Content processing (merging streaming chunks, associating tool results)
+ * is done in cc-messages.tsx for cleaner separation of concerns.
  */
 export function useSessionEntries(
   taskId: string | undefined,
@@ -42,8 +45,12 @@ export function useSessionEntries(
   const seenUuidsRef = useRef(new Set<string>());
 
   // Fetch initial entries from API
-  const { data: rawEntries = [], isLoading, error } = useQuery({
-    queryKey: ["session-entries", taskId],
+  const {
+    data: rawEntries = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['session-entries', taskId],
     queryFn: () => fetchSessionEntries(taskId!),
     enabled: enabled && !!taskId,
     staleTime: 30000, // 30 seconds
@@ -56,133 +63,42 @@ export function useSessionEntries(
 
     // Add all UUIDs from fetched entries
     for (const entry of rawEntries) {
-      const uuid = "uuid" in entry && typeof entry.uuid === "string" ? entry.uuid : null;
+      const uuid =
+        'uuid' in entry && typeof entry.uuid === 'string' ? entry.uuid : null;
       if (uuid) {
         seenUuidsRef.current.add(uuid);
       }
     }
   }, [rawEntries, taskId]);
 
-  // Deduplicate and filter entries
+  // Filter entries - minimal processing, let cc-messages handle the rest
   const entries = useMemo(() => {
-    // Debug: Log raw entries before any processing
-    console.log(`[SESSION_ENTRIES] Raw entries (${rawEntries.length}):`, rawEntries.map(e => ({
-      type: e.type,
-      uuid: "uuid" in e ? (e.uuid as string)?.substring(0, 8) : undefined,
-      parentUuid: "parentUuid" in e ? (e.parentUuid as string)?.substring(0, 8) : undefined,
-      isSidechain: "isSidechain" in e ? e.isSidechain : undefined,
-      hasToolResult: e.type === "user" && "message" in e && Array.isArray((e.message as {content?: unknown})?.content)
-        ? ((e.message as {content: unknown[]}).content).some((b: unknown) => typeof b === "object" && b !== null && "type" in b && (b as {type: string}).type === "tool_result")
-        : false,
-    })));
-
-    // Helper to get content key for deduplication
-    const getContentKey = (entry: SessionEntry): string => {
-      if (entry.type === "user" && "message" in entry) {
-        const content = entry.message?.content;
-        if (typeof content === "string") return `user:${content}`;
-        if (Array.isArray(content)) {
-          const text = content.map(b => "text" in b ? b.text : "").join("");
-          return `user:${text}`;
-        }
-      }
-      if (entry.type === "assistant" && "message" in entry) {
-        const content = entry.message?.content;
-        if (typeof content === "string") return `assistant:${content}`;
-        if (Array.isArray(content)) {
-          // For assistant, use first text block as key
-          const textBlocks = content.filter(b => "text" in b);
-          const firstTextBlock = textBlocks[0];
-          if (firstTextBlock && "text" in firstTextBlock) {
-            return `assistant:${(firstTextBlock as { text: string }).text}`;
-          }
-        }
-      }
-      // For other types, use uuid if available
-      const uuid = "uuid" in entry && typeof entry.uuid === "string" ? entry.uuid : null;
-      return uuid || `${entry.type}:${Math.random()}`;
-    };
-
-    // Deduplicate by content key (not UUID - session watcher creates new UUIDs each save)
-    // IMPORTANT: Keep the LAST occurrence (not first) because streaming updates
-    // may write multiple versions of the same entry, and later versions are more complete
-    const seen = new Map<string, number>(); // key -> last index
-    rawEntries.forEach((entry, index) => {
-      const key = getContentKey(entry);
-      seen.set(key, index);
-    });
-    const deduplicated = rawEntries.filter((entry, index) => {
-      // Keep only entries that are the last occurrence of their key
-      const key = getContentKey(entry);
-      return seen.get(key) === index;
-    });
-
-    // Filter out entries we don't want to display
-    const filtered = deduplicated.filter((entry) => {
-      // Skip queue operations
-      if (entry.type === "queue-operation") return false;
-
-      // Skip file history snapshots
-      if (entry.type === "file-history-snapshot") return false;
-
-      // Skip summary messages
-      if (entry.type === "summary") return false;
-
-      // Skip system messages (for now)
-      if (entry.type === "system") return false;
-
-      // Skip sidechain messages (warmup/subagent messages)
-      // isSidechain is a required field on user/assistant messages
-      // BUT: Don't filter out tool results - they're part of the main conversation
-      if (entry.type === "user" || entry.type === "assistant") {
-        if (entry.isSidechain) {
-          // Check if this is a tool result message - don't filter those
-          if (entry.type === "user" && "message" in entry) {
-            const content = entry.message?.content;
-            if (Array.isArray(content)) {
-              const hasToolResult = content.some(block => "type" in block && block.type === "tool_result");
-              if (hasToolResult) {
-                return true; // Keep tool result messages
-              }
-            }
-          }
-          return false;
-        }
-      }
-
+    // Step 1: UUID-based dedup only (for true duplicates from accumulation bugs)
+    const seenUuids = new Set<string>();
+    const uuidDeduped = rawEntries.filter(entry => {
+      const uuid =
+        'uuid' in entry && typeof entry.uuid === 'string' ? entry.uuid : null;
+      if (!uuid) return true; // Keep entries without UUID (file-history-snapshot etc)
+      if (seenUuids.has(uuid)) return false;
+      seenUuids.add(uuid);
       return true;
     });
 
-    // Log what was filtered out for debugging
-    const filteredOut = deduplicated.filter(e => !filtered.includes(e));
-    if (filteredOut.length > 0) {
-      console.log(`[SESSION_ENTRIES] Filtered out:`, filteredOut.map(e => {
-        let hasToolResult = false;
-        let contentPreview: string | undefined;
-        if (e.type === "user" && "message" in e) {
-          const msg = e.message as { content?: unknown };
-          if (Array.isArray(msg?.content)) {
-            hasToolResult = msg.content.some((b: unknown) => typeof b === "object" && b !== null && "type" in b && (b as { type: string }).type === "tool_result");
-          }
-          if (typeof msg?.content === "string") {
-            contentPreview = msg.content.substring(0, 100);
-          }
-        }
-        return {
-          type: e.type,
-          isSidechain: "isSidechain" in e ? e.isSidechain : undefined,
-          hasToolResult,
-          contentPreview
-        };
-      }));
-    }
-    console.log(`[SESSION_ENTRIES] ${rawEntries.length} raw → ${deduplicated.length} deduped → ${filtered.length} filtered`);
+    // Step 2: Filter out entry types we never want to display
+    const filtered = uuidDeduped.filter(entry => {
+      // Skip internal/metadata types
+      if (entry.type === 'queue-operation') return false;
+      if (entry.type === 'file-history-snapshot') return false;
+      if (entry.type === 'summary') return false;
 
-    // Log all entries for debugging
-    console.log(`[SESSION_ENTRIES] All entries:`, deduplicated.map(e => ({
-      type: e.type,
-      isSidechain: "isSidechain" in e ? e.isSidechain : undefined,
-    })));
+      // Keep system messages - cc-messages can decide which subtypes to show
+      // Keep all user and assistant messages - cc-messages will handle:
+      //   - Merging streaming chunks (same message.id)
+      //   - Extracting tool results
+      //   - Filtering sidechain messages
+
+      return true;
+    });
 
     return filtered;
   }, [rawEntries]);
@@ -191,17 +107,17 @@ export function useSessionEntries(
   const addEntry = useCallback(
     (entry: SessionEntry) => {
       // Fast O(1) dedup check using ref
-      const uuid = "uuid" in entry && typeof entry.uuid === "string" ? entry.uuid : null;
+      const uuid =
+        'uuid' in entry && typeof entry.uuid === 'string' ? entry.uuid : null;
       if (uuid) {
         if (seenUuidsRef.current.has(uuid)) {
-          console.log(`[SESSION_ENTRIES] Skipping duplicate entry: ${uuid.substring(0, 8)}...`);
           return;
         }
         seenUuidsRef.current.add(uuid);
       }
 
       queryClient.setQueryData<SessionEntry[]>(
-        ["session-entries", taskId],
+        ['session-entries', taskId],
         (old = []) => [...old, entry]
       );
     },
@@ -212,11 +128,11 @@ export function useSessionEntries(
   const addEntries = useCallback(
     (newEntries: SessionEntry[]) => {
       // Filter using seenUuidsRef for O(1) lookups
-      const uniqueNew = newEntries.filter((entry) => {
-        const uuid = "uuid" in entry && typeof entry.uuid === "string" ? entry.uuid : null;
+      const uniqueNew = newEntries.filter(entry => {
+        const uuid =
+          'uuid' in entry && typeof entry.uuid === 'string' ? entry.uuid : null;
         if (uuid) {
           if (seenUuidsRef.current.has(uuid)) {
-            console.log(`[SESSION_ENTRIES] Skipping duplicate entry: ${uuid.substring(0, 8)}...`);
             return false;
           }
           seenUuidsRef.current.add(uuid);
@@ -227,7 +143,7 @@ export function useSessionEntries(
       if (uniqueNew.length === 0) return;
 
       queryClient.setQueryData<SessionEntry[]>(
-        ["session-entries", taskId],
+        ['session-entries', taskId],
         (old = []) => [...old, ...uniqueNew]
       );
     },
@@ -268,16 +184,17 @@ export function useSessionEntries(
       sessionCompletedRef.current = true;
       setIsStreaming(false);
       // Refetch to ensure we have all entries
-      queryClient.invalidateQueries({ queryKey: ["session-entries", taskId] });
+      queryClient.invalidateQueries({ queryKey: ['session-entries', taskId] });
     }
 
     function onSessionComplete(data: { taskId: string }) {
       if (data.taskId === taskId) {
-        console.log("[SESSION_ENTRIES] Session complete, refetching entries");
         sessionCompletedRef.current = true;
         setIsStreaming(false);
         // Refetch to ensure we have all entries from the completed session
-        queryClient.invalidateQueries({ queryKey: ["session-entries", taskId] });
+        queryClient.invalidateQueries({
+          queryKey: ['session-entries', taskId],
+        });
       }
     }
 
@@ -287,29 +204,30 @@ export function useSessionEntries(
       }
     }
 
-    socket.on("session-entry", onSessionEntry);
-    socket.on("session-entries", onSessionEntries);
-    socket.on("stream-complete", onStreamComplete);
-    socket.on("session-complete", onSessionComplete);
-    socket.on("agent-stopped", onAgentStopped);
+    socket.on('session-entry', onSessionEntry);
+    socket.on('session-entries', onSessionEntries);
+    socket.on('stream-complete', onStreamComplete);
+    socket.on('session-complete', onSessionComplete);
+    socket.on('agent-stopped', onAgentStopped);
 
     return () => {
-      socket.off("session-entry", onSessionEntry);
-      socket.off("session-entries", onSessionEntries);
-      socket.off("stream-complete", onStreamComplete);
-      socket.off("session-complete", onSessionComplete);
-      socket.off("agent-stopped", onAgentStopped);
+      socket.off('session-entry', onSessionEntry);
+      socket.off('session-entries', onSessionEntries);
+      socket.off('stream-complete', onStreamComplete);
+      socket.off('session-complete', onSessionComplete);
+      socket.off('agent-stopped', onAgentStopped);
     };
   }, [socket, taskId, isConnected, enabled, addEntry, addEntries, queryClient]);
 
   // Clear entries for a task (useful for resets)
   const clearEntries = useCallback(() => {
     seenUuidsRef.current.clear();
-    queryClient.setQueryData(["session-entries", taskId], []);
+    queryClient.setQueryData(['session-entries', taskId], []);
   }, [queryClient, taskId]);
 
   return {
     entries,
+    rawEntries, // Expose raw entries for debugging
     isLoading,
     error,
     isStreaming,

@@ -19,6 +19,8 @@ import { CCToolUseBlock } from "./cc-tool-use-block";
 
 interface CCAssistantMessageProps {
   message: AssistantMessage;
+  /** Pre-merged content blocks from streaming chunk merging */
+  mergedContent?: ContentBlock[];
   toolResults?: Map<string, ToolResultBlock>;
   isStreaming?: boolean;
   className?: string;
@@ -80,11 +82,13 @@ function groupContentBlocks(
  */
 export function CCAssistantMessage({
   message,
+  mergedContent,
   toolResults,
   isStreaming = false,
   className,
 }: CCAssistantMessageProps) {
-  const content = message.message.content;
+  // Use pre-merged content if provided, otherwise fall back to message content
+  const content = mergedContent ?? message.message.content;
 
   // Build tool results map from content if not provided
   const resultsMap = useMemo(() => {
