@@ -3,14 +3,22 @@
 import {
   ChevronDown,
   ChevronRight,
+  Download,
   Folder,
   FolderOpen,
   Loader2,
+  MoreVertical,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { FileNode } from "@repo/types";
 import { FileIcon } from "@/components/ui/file-icon";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface FileChangeOperation {
   filePath: string;
@@ -20,6 +28,7 @@ interface FileChangeOperation {
 type BaseProps = {
   files: FileNode[];
   onFileSelect: (file: FileNode) => void;
+  onFileDownload?: (file: FileNode) => void;
 };
 
 type AgentEnvironmentProps = BaseProps & {
@@ -40,6 +49,7 @@ export function FileExplorer(props: AgentEnvironmentProps | OtherViewProps) {
   const isAgentEnvironment = props.isAgentEnvironment;
   const files = props.files;
   const onFileSelect = props.onFileSelect;
+  const onFileDownload = props.onFileDownload;
 
   const selectedFilePath = isAgentEnvironment ? props.selectedFilePath : null;
   const defaultFolderExpansion = isAgentEnvironment
@@ -150,51 +160,79 @@ export function FileExplorer(props: AgentEnvironmentProps | OtherViewProps) {
             style={{ left: `${depth * 12 + 12}px` }}
           />
         )}
-        <button
-          className={`group/item text-foreground/80 hover:text-foreground flex cursor-pointer items-center gap-1.5 overflow-hidden rounded-md px-2 py-1 hover:bg-white/10 ${
-            isSelected ? "bg-white/5" : ""
-          } ${operation ? "justify-between" : ""}`}
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
-          onClick={() => {
-            if (node.type === "folder") {
-              toggleFolder(node.path);
-            } else if (onFileSelect) {
-              onFileSelect(node);
-            }
-          }}
-        >
-          <div
-            className="flex items-center gap-1.5 overflow-hidden"
-            title={node.name}
-          >
-            {node.type === "folder" ? (
-              isExpanded ? (
-                <>
-                  <FolderOpen className="size-4 shrink-0 group-hover/item:hidden" />
-                  <ChevronDown className="hidden size-4 shrink-0 group-hover/item:block" />
-                </>
-              ) : (
-                <>
-                  <Folder className="size-4 shrink-0 group-hover/item:hidden" />
-                  <ChevronRight className="hidden size-4 shrink-0 group-hover/item:block" />
-                </>
-              )
-            ) : (
-              <FileIcon filename={node.name} className="size-4" useFallback />
-            )}
-            <span className="truncate text-sm">{node.name}</span>
-          </div>
-          {node.type === "file" && operation && (
-            <span
-              className={cn(
-                "text-xs font-medium",
-                getOperationColor(operation)
-              )}
-            >
-              {getOperationLetter(operation)}
-            </span>
+        <div
+          className={cn(
+            "group/item text-foreground/80 hover:text-foreground flex cursor-pointer items-center justify-between overflow-hidden rounded-md px-2 py-1 hover:bg-white/10",
+            isSelected && "bg-white/5"
           )}
-        </button>
+          style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        >
+          <button
+            className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden"
+            onClick={() => {
+              if (node.type === "folder") {
+                toggleFolder(node.path);
+              } else if (onFileSelect) {
+                onFileSelect(node);
+              }
+            }}
+          >
+            <div
+              className="flex items-center gap-1.5 overflow-hidden"
+              title={node.name}
+            >
+              {node.type === "folder" ? (
+                isExpanded ? (
+                  <>
+                    <FolderOpen className="size-4 shrink-0 group-hover/item:hidden" />
+                    <ChevronDown className="hidden size-4 shrink-0 group-hover/item:block" />
+                  </>
+                ) : (
+                  <>
+                    <Folder className="size-4 shrink-0 group-hover/item:hidden" />
+                    <ChevronRight className="hidden size-4 shrink-0 group-hover/item:block" />
+                  </>
+                )
+              ) : (
+                <FileIcon filename={node.name} className="size-4" useFallback />
+              )}
+              <span className="truncate text-sm">{node.name}</span>
+            </div>
+          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            {node.type === "file" && operation && (
+              <span
+                className={cn(
+                  "text-xs font-medium",
+                  getOperationColor(operation)
+                )}
+              >
+                {getOperationLetter(operation)}
+              </span>
+            )}
+            {node.type === "file" && onFileDownload && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="text-muted-foreground hover:text-foreground rounded p-0.5 opacity-0 transition-opacity hover:bg-white/10 group-hover/item:opacity-100 data-[state=open]:opacity-100"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical className="size-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="bottom" align="start" sideOffset={4}>
+                  <DropdownMenuItem
+                    onClick={() => onFileDownload(node)}
+                    className="cursor-pointer"
+                  >
+                    <Download className="size-3.5" />
+                    Download
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </div>
         {node.type === "folder" && isExpanded && node.children && (
           <div className="flex flex-col gap-0.5">
             {node.children.map((child) => renderNode(child, depth + 1))}

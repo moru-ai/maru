@@ -15,6 +15,8 @@ import { LeftPanelOpenIcon } from "../graphics/icons/left-panel-open-icon";
 import { Close as SheetPrimitiveClose } from "@radix-ui/react-dialog";
 import { useTaskStatus } from "@/hooks/tasks/use-task-status";
 import { SheetTitle } from "../ui/sheet";
+import { FileNode } from "@repo/types";
+import { toast } from "sonner";
 
 function AgentEnvironment({
   isSheetOverlay = false,
@@ -47,6 +49,35 @@ function AgentEnvironment({
       panel.collapse();
     }
   }, [rightPanelRef]);
+
+  const handleFileDownload = useCallback(
+    async (file: FileNode) => {
+      try {
+        const params = new URLSearchParams({ path: file.path });
+        const res = await fetch(`/api/tasks/${taskId}/files/content?${params}`);
+
+        if (!res.ok) {
+          throw new Error("Failed to fetch file");
+        }
+
+        const data = await res.json();
+        if (!data.success || !data.content) {
+          throw new Error("Failed to get file content");
+        }
+
+        const blob = new Blob([data.content], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch {
+        toast.error("Failed to download file");
+      }
+    },
+    [taskId]
+  );
 
   // Loading state UI
   if (isLoading) {
@@ -148,6 +179,7 @@ function AgentEnvironment({
           isAgentEnvironment={true}
           files={treeData?.tree || []}
           onFileSelect={(file) => updateSelectedFilePath(file.path)}
+          onFileDownload={handleFileDownload}
           selectedFilePath={selectedFilePath}
           isCollapsed={isExplorerCollapsed}
           onToggleCollapse={() => setIsExplorerCollapsed(!isExplorerCollapsed)}
