@@ -4,7 +4,6 @@ initializeTelemetry();
 
 import { socketIOServer } from "./app";
 import config from "./config";
-import { stopAllFileSystemWatchers } from "./agent/tools";
 import { taskCleanupService } from "./services/task-cleanup";
 
 // Use single server for both HTTP and WebSocket
@@ -21,9 +20,6 @@ const shutdown = (signal: string) => {
 
   // Stop cleanup service
   taskCleanupService.stop();
-
-  // Stop all filesystem watchers first
-  stopAllFileSystemWatchers();
 
   // Close server (handles both HTTP and WebSocket)
   server.close(async () => {

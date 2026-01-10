@@ -239,7 +239,7 @@ async function getExistingShadowWikiContent(taskId: string): Promise<string> {
     let codebaseUnderstanding = task.codebaseUnderstanding;
 
     // If no codebase understanding exists for this task, check if one exists for the repo
-    if (!codebaseUnderstanding) {
+    if (!codebaseUnderstanding && task.repoFullName) {
       codebaseUnderstanding = await prisma.codebaseUnderstanding.findUnique({
         where: { repoFullName: task.repoFullName },
       });

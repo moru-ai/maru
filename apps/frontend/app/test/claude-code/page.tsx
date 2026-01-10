@@ -48,6 +48,7 @@ export default function ClaudeCodeTestPage() {
               <SelectContent className="max-h-[500px]">
                 {MOCK_CASE_IDS.map((caseId) => {
                   const mockCase = MOCK_CASES[caseId];
+                  if (!mockCase) return null;
                   return (
                     <SelectItem key={caseId} value={caseId}>
                       <div className="flex items-center gap-2">

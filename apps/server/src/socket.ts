@@ -4,7 +4,6 @@ import {
   ServerToClientEvents,
   ClientToServerEvents,
   TerminalEntry,
-  TerminalHistoryResponse,
   ModelType,
   ApiKeys,
 } from "@repo/types";
@@ -13,8 +12,6 @@ import { Server, Socket } from "socket.io";
 import { chatService } from "./app";
 import config, { getCorsOrigins } from "./config";
 import { updateTaskStatus } from "./utils/task-status";
-import { createToolExecutor } from "./execution";
-import { setupSidecarNamespace } from "./services/sidecar-socket-handler";
 import { parseApiKeysFromCookies } from "./utils/cookie-parser";
 import { modelContextService } from "./services/model-context-service";
 import { ensureTaskInfrastructureExists } from "./utils/infrastructure-check";
@@ -51,177 +48,25 @@ function cleanupTaskStreamState(taskId: string): void {
   console.log(`[SOCKET] Cleaned up stream state for task ${taskId}`);
 }
 
-async function getTerminalHistory(taskId: string): Promise<TerminalEntry[]> {
-  try {
-    const task = await prisma.task.findUnique({
-      where: { id: taskId },
-      select: { workspacePath: true },
-    });
-
-    if (!task) {
-      throw new Error(`Task ${taskId} not found`);
-    }
-
-    // Create executor based on current mode
-    const agentMode = config.agentMode;
-    const executor = await createToolExecutor(
-      taskId,
-      task.workspacePath || undefined,
-      agentMode
-    );
-
-    if (executor.isRemote()) {
-      // Get the sidecar URL from the remote executor
-      const sidecarUrl =
-        "sidecarUrl" in executor
-          ? (executor as { sidecarUrl: string }).sidecarUrl
-          : undefined;
-      if (!sidecarUrl) {
-        throw new Error(`Sidecar URL not available for remote task ${taskId}`);
-      }
-
-      const response = await fetch(
-        `${sidecarUrl}/api/terminal/history?count=100`
-      );
-      if (!response.ok) {
-        throw new Error(`Sidecar terminal API error: ${response.status}`);
-      }
-      const data = (await response.json()) as TerminalHistoryResponse;
-      return data.entries || [];
-    } else {
-      // For local mode, return empty for now (no local buffer yet)
-      // TODO: Implement local terminal buffer
-      return [];
-    }
-  } catch (error) {
-    console.error("Error fetching terminal history:", error);
-    return [];
-  }
+async function getTerminalHistory(_taskId: string): Promise<TerminalEntry[]> {
+  // Terminal history is handled by moru-session-watcher for Moru mode
+  // Return empty array as terminal output is streamed directly
+  return [];
 }
 
-async function clearTerminal(taskId: string): Promise<void> {
-  try {
-    const task = await prisma.task.findUnique({
-      where: { id: taskId },
-      select: { workspacePath: true },
-    });
-
-    if (!task) {
-      throw new Error(`Task ${taskId} not found`);
-    }
-
-    const agentMode = config.agentMode;
-    const executor = await createToolExecutor(
-      taskId,
-      task.workspacePath || undefined,
-      agentMode
-    );
-
-    if (executor.isRemote()) {
-      // Get the sidecar URL from the remote executor
-      const sidecarUrl =
-        "sidecarUrl" in executor
-          ? (executor as { sidecarUrl: string }).sidecarUrl
-          : undefined;
-      if (!sidecarUrl) {
-        throw new Error(`Sidecar URL not available for remote task ${taskId}`);
-      }
-
-      // Call sidecar terminal clear API
-      const response = await fetch(`${sidecarUrl}/api/terminal/clear`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!response.ok) {
-        throw new Error(`Sidecar terminal clear API error: ${response.status}`);
-      }
-    } else {
-      // For local mode, nothing to clear yet
-      // TODO: Implement local terminal buffer
-    }
-  } catch (error) {
-    console.error("Error clearing terminal:", error);
-    throw error;
-  }
+async function clearTerminal(_taskId: string): Promise<void> {
+  // Terminal clearing is handled client-side for Moru mode
+  // No server-side action needed
 }
 
-// Terminal polling for real-time updates (for remote mode)
-const terminalPollingIntervals = new Map<string, NodeJS.Timeout>();
-
-function startTerminalPolling(taskId: string) {
-  // Avoid duplicate polling
-  if (terminalPollingIntervals.has(taskId)) {
-    return;
-  }
-
-  let lastSeenId = 0;
-
-  const interval = setInterval(async () => {
-    try {
-      const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        select: { workspacePath: true },
-      });
-
-      if (!task) {
-        stopTerminalPolling(taskId);
-        return;
-      }
-
-      const agentMode = config.agentMode;
-      const executor = await createToolExecutor(
-        taskId,
-        task.workspacePath || undefined,
-        agentMode
-      );
-
-      if (executor.isRemote()) {
-        // Get the sidecar URL from the remote executor
-        const sidecarUrl =
-          "sidecarUrl" in executor
-            ? (executor as { sidecarUrl: string }).sidecarUrl
-            : undefined;
-        if (!sidecarUrl) {
-          console.error(
-            `[SOCKET] Sidecar URL not available for remote task ${taskId}, stopping polling`
-          );
-          stopTerminalPolling(taskId);
-          return;
-        }
-
-        // Poll sidecar for new entries
-        const response = await fetch(
-          `${sidecarUrl}/api/terminal/history?sinceId=${lastSeenId}`
-        );
-        if (response.ok) {
-          const data = (await response.json()) as TerminalHistoryResponse;
-          const newEntries = data.entries || [];
-
-          // Emit new entries to connected clients in the task room
-          newEntries.forEach((entry: TerminalEntry) => {
-            if (entry.id > lastSeenId) {
-              lastSeenId = entry.id;
-              emitToTask(taskId, "terminal-output", { taskId, entry });
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.error(`Terminal polling error for task ${taskId}:`, error);
-    }
-  }, 1000); // Poll every second
-
-  terminalPollingIntervals.set(taskId, interval);
-  console.log(`[SOCKET] Started terminal polling for task ${taskId}`);
+// Terminal updates are handled by moru-session-watcher for Moru mode
+// These functions are kept as no-ops for compatibility
+function startTerminalPolling(_taskId: string) {
+  // No-op: Moru mode uses moru-session-watcher for terminal output
 }
 
-function stopTerminalPolling(taskId: string) {
-  const interval = terminalPollingIntervals.get(taskId);
-  if (interval) {
-    clearInterval(interval);
-    terminalPollingIntervals.delete(taskId);
-    console.log(`[SOCKET] Stopped terminal polling for task ${taskId}`);
-  }
+function stopTerminalPolling(_taskId: string) {
+  // No-op: Moru mode uses moru-session-watcher for terminal output
 }
 
 async function verifyTaskAccess(
@@ -272,12 +117,6 @@ export function createSocketServer(
       secure: isProduction,
     },
   });
-
-  // Set up sidecar namespace for filesystem watching (only in remote mode)
-  const agentMode = config.agentMode;
-  if (agentMode === "remote") {
-    setupSidecarNamespace(io);
-  }
 
   io.on("connection", (socket: TypedSocket) => {
     const connectionId = socket.id;
@@ -817,6 +656,12 @@ export function emitStreamChunk(chunk: StreamChunk, taskId: string) {
 export function emitTerminalOutput(taskId: string, entry: TerminalEntry) {
   if (io) {
     emitToTask(taskId, "terminal-output", { taskId, entry });
+  }
+}
+
+export function emitSessionEntry(taskId: string, entry: unknown) {
+  if (io) {
+    emitToTask(taskId, "session-entry", { taskId, entry });
   }
 }
 

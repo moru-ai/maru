@@ -1,27 +1,17 @@
 import { InitStatus, prisma } from "@repo/db";
-import { getStepsForMode, InitializationProgress } from "@repo/types";
+import { MORU_INIT_STEPS, InitializationProgress } from "@repo/types";
 import { emitStreamChunk } from "../socket";
-import { createWorkspaceManager, getAgentMode } from "../execution";
-import type { WorkspaceManager as AbstractWorkspaceManager } from "../execution";
 import { moruWorkspaceManager } from "../execution/moru/moru-workspace-manager";
-import { MoruGitService } from "../execution/moru/moru-git-service";
 import {
   setInitStatus,
   setTaskFailed,
   clearTaskProgress,
   setTaskInitialized,
 } from "../utils/task-status";
-import { getGitHubAccessToken } from "../github/auth/account-service";
-
-// Helper for async delays
-const delay = (ms: number) =>
-  new Promise((resolve) => global.setTimeout(resolve, ms));
 
 export class TaskInitializationEngine {
-  private abstractWorkspaceManager: AbstractWorkspaceManager;
-
   constructor() {
-    this.abstractWorkspaceManager = createWorkspaceManager(); // Abstraction layer for all modes
+    // Workspace manager is accessed directly via moruWorkspaceManager singleton
   }
 
   /**
@@ -29,7 +19,7 @@ export class TaskInitializationEngine {
    */
   async initializeTask(
     taskId: string,
-    steps: InitStatus[] = ["PREPARE_WORKSPACE"],
+    steps: InitStatus[] = ["CREATE_SANDBOX"],
     userId: string
   ): Promise<void> {
     try {
@@ -45,7 +35,7 @@ export class TaskInitializationEngine {
       // Execute each step in sequence
       for (let i = 0; i < steps.length; i++) {
         const step = steps[i];
-        if (!step) continue; // Skip undefined steps
+        if (!step) continue;
         const stepNumber = i + 1;
 
         try {
@@ -91,7 +81,6 @@ export class TaskInitializationEngine {
 
       // All steps completed successfully - set to ACTIVE
       await setInitStatus(taskId, "ACTIVE");
-      // Mark task as having been initialized for the first time
       await setTaskInitialized(taskId);
 
       console.log(`✅ [TASK_INIT] ${taskId}: Ready for RUNNING status`);
@@ -116,33 +105,8 @@ export class TaskInitializationEngine {
     userId: string
   ): Promise<void> {
     switch (step) {
-      case "PREPARE_WORKSPACE":
-        await this.executePrepareWorkspace(taskId, userId);
-        break;
-
-      case "CREATE_VM":
-        await this.executeCreateVM(taskId, userId);
-        break;
-
-      case "WAIT_VM_READY":
-        await this.executeWaitVMReady(taskId);
-        break;
-
-      case "VERIFY_VM_WORKSPACE":
-        await this.executeVerifyVMWorkspace(taskId, userId);
-        break;
-
-      // Moru mode steps
       case "CREATE_SANDBOX":
         await this.executeCreateSandbox(taskId, userId);
-        break;
-
-      case "CLONE_REPOSITORY":
-        await this.executeCloneRepository(taskId, userId);
-        break;
-
-      case "SETUP_GIT":
-        await this.executeSetupGit(taskId, userId);
         break;
 
       case "INACTIVE":
@@ -151,209 +115,18 @@ export class TaskInitializationEngine {
         break;
 
       default:
-        throw new Error(`Unknown initialization step: ${step}`);
+        throw new Error(`Unknown or unsupported initialization step: ${step}`);
     }
   }
 
   /**
-   * Prepare workspace step - local mode only
-   * Creates local workspace directory
-   */
-  private async executePrepareWorkspace(
-    taskId: string,
-    userId: string
-  ): Promise<void> {
-    const agentMode = getAgentMode();
-    if (agentMode !== "local") {
-      throw new Error(
-        `PREPARE_WORKSPACE step should only be used in local mode, but agent mode is: ${agentMode}`
-      );
-    }
-
-    // Use workspace manager to prepare local workspace
-    const workspaceResult =
-      await this.abstractWorkspaceManager.prepareWorkspace({
-        id: taskId,
-        userId,
-      });
-
-    if (!workspaceResult.success) {
-      throw new Error(
-        workspaceResult.error || "Failed to prepare local workspace"
-      );
-    }
-
-    // Update task with workspace path
-    await prisma.task.update({
-      where: { id: taskId },
-      data: { workspacePath: workspaceResult.workspacePath },
-    });
-  }
-
-  /**
-   * Create VM step - remote mode only
-   * Creates remote VM pod (VM startup script handles repository cloning)
-   */
-  private async executeCreateVM(taskId: string, userId: string): Promise<void> {
-    const agentMode = getAgentMode();
-    if (agentMode !== "remote") {
-      throw new Error(
-        `CREATE_VM step should only be used in remote mode, but agent mode is: ${agentMode}`
-      );
-    }
-
-    try {
-      // Get task info
-      const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        select: {
-          repoFullName: true,
-          repoUrl: true,
-          baseBranch: true,
-          shadowBranch: true,
-        },
-      });
-
-      if (!task) {
-        throw new Error(`Task not found: ${taskId}`);
-      }
-
-      const workspaceInfo =
-        await this.abstractWorkspaceManager.prepareWorkspace({
-          id: taskId,
-          repoFullName: task.repoFullName,
-          repoUrl: task.repoUrl,
-          baseBranch: task.baseBranch || "main",
-          shadowBranch: task.shadowBranch || `shadow/task-${taskId}`,
-          userId,
-        });
-
-      if (!workspaceInfo.success) {
-        throw new Error(`Failed to create VM: ${workspaceInfo.error}`);
-      }
-
-      if (workspaceInfo.podName && workspaceInfo.podNamespace) {
-        await prisma.taskSession.create({
-          data: {
-            taskId,
-            podName: workspaceInfo.podName,
-            podNamespace: workspaceInfo.podNamespace,
-            isActive: true,
-          },
-        });
-      }
-
-      await prisma.task.update({
-        where: { id: taskId },
-        data: {
-          workspacePath: workspaceInfo.workspacePath,
-        },
-      });
-    } catch (error) {
-      console.error(`[TASK_INIT] ${taskId}: Failed to create VM:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Wait for VM ready step - Wait for VM boot and sidecar API to become healthy
-   */
-  private async executeWaitVMReady(taskId: string): Promise<void> {
-    try {
-      const executor = await this.abstractWorkspaceManager.getExecutor(taskId);
-
-      // Wait for both sidecar to be healthy AND repository to be cloned
-      const maxRetries = 5;
-      const retryDelay = 2000;
-
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          // Test sidecar connectivity AND verify workspace has content
-          const listing = await executor.listDirectory(".");
-
-          if (
-            listing.success &&
-            listing.contents &&
-            listing.contents.length > 0
-          ) {
-            return;
-          } else {
-            throw new Error(
-              `Sidecar responding but workspace appears empty. Response: ${JSON.stringify(listing)}`
-            );
-          }
-        } catch (error) {
-          if (attempt === maxRetries) {
-            throw new Error(
-              `Sidecar/clone failed to become ready after ${maxRetries} attempts: ${error}`
-            );
-          }
-          await delay(retryDelay);
-        }
-      }
-    } catch (error) {
-      console.error(
-        `[TASK_INIT] ${taskId}: Failed waiting for sidecar and clone:`,
-        error
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Verify VM workspace step - Verify workspace is ready and contains repository
-   */
-  private async executeVerifyVMWorkspace(
-    taskId: string,
-    _userId: string
-  ): Promise<void> {
-    try {
-      // Get task info
-      const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        select: { repoUrl: true, baseBranch: true },
-      });
-
-      if (!task) {
-        throw new Error(`Task not found: ${taskId}`);
-      }
-
-      const executor = await this.abstractWorkspaceManager.getExecutor(taskId);
-
-      const listing = await executor.listDirectory(".");
-      if (
-        !listing.success ||
-        !listing.contents ||
-        listing.contents.length === 0
-      ) {
-        throw new Error(
-          "Workspace verification failed - workspace appears empty"
-        );
-      }
-    } catch (error) {
-      console.error(
-        `[TASK_INIT] ${taskId}: Failed to verify workspace:`,
-        error
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Create Moru Sandbox step - moru mode only
+   * Create Moru Sandbox step
    * Creates a new Moru sandbox VM for the task
    */
   private async executeCreateSandbox(
     taskId: string,
     userId: string
   ): Promise<void> {
-    const agentMode = getAgentMode();
-    if (agentMode !== "moru") {
-      throw new Error(
-        `CREATE_SANDBOX step should only be used in moru mode, but agent mode is: ${agentMode}`
-      );
-    }
-
     try {
       // Get task info
       const task = await prisma.task.findUnique({
@@ -402,148 +175,6 @@ export class TaskInitializationEngine {
   }
 
   /**
-   * Clone Repository step - moru mode only
-   * Clones the repository into the Moru sandbox
-   */
-  private async executeCloneRepository(
-    taskId: string,
-    userId: string
-  ): Promise<void> {
-    const agentMode = getAgentMode();
-    if (agentMode !== "moru") {
-      throw new Error(
-        `CLONE_REPOSITORY step should only be used in moru mode, but agent mode is: ${agentMode}`
-      );
-    }
-
-    try {
-      // Get task info
-      const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        select: {
-          repoUrl: true,
-          baseBranch: true,
-        },
-      });
-
-      if (!task) {
-        throw new Error(`Task not found: ${taskId}`);
-      }
-
-      // Get GitHub token for cloning
-      const githubToken = await getGitHubAccessToken(userId);
-
-      if (!githubToken) {
-        throw new Error("GitHub access token not found for user");
-      }
-
-      // Get sandbox and clone repository
-      const sandbox = await moruWorkspaceManager.getSandbox(taskId);
-      if (!sandbox) {
-        throw new Error(`No sandbox found for task ${taskId}`);
-      }
-
-      const gitService = new MoruGitService(sandbox);
-
-      console.log(`[TASK_INIT] ${taskId}: Cloning repository...`);
-
-      await gitService.cloneRepository(
-        task.repoUrl,
-        task.baseBranch || "main",
-        githubToken
-      );
-
-      console.log(`[TASK_INIT] ${taskId}: Repository cloned successfully`);
-    } catch (error) {
-      console.error(`[TASK_INIT] ${taskId}: Failed to clone repository:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Setup Git step - moru mode only
-   * Configures git user and creates shadow branch
-   */
-  private async executeSetupGit(
-    taskId: string,
-    userId: string
-  ): Promise<void> {
-    const agentMode = getAgentMode();
-    if (agentMode !== "moru") {
-      throw new Error(
-        `SETUP_GIT step should only be used in moru mode, but agent mode is: ${agentMode}`
-      );
-    }
-
-    try {
-      // Get task info
-      const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        select: {
-          baseBranch: true,
-          shadowBranch: true,
-        },
-      });
-
-      if (!task) {
-        throw new Error(`Task not found: ${taskId}`);
-      }
-
-      // Get user info for git config
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { name: true, email: true },
-      });
-
-      if (!user) {
-        throw new Error(`User not found: ${userId}`);
-      }
-
-      // Get sandbox
-      const sandbox = await moruWorkspaceManager.getSandbox(taskId);
-      if (!sandbox) {
-        throw new Error(`No sandbox found for task ${taskId}`);
-      }
-
-      const gitService = new MoruGitService(sandbox);
-
-      console.log(`[TASK_INIT] ${taskId}: Configuring git...`);
-
-      // Configure git user
-      await gitService.configureGitUser({
-        name: user.name || "Shadow Agent",
-        email: user.email || "shadow@example.com",
-      });
-
-      // Create shadow branch from base branch
-      const baseBranch = task.baseBranch || "main";
-      const shadowBranch = task.shadowBranch || `shadow/task-${taskId}`;
-
-      console.log(
-        `[TASK_INIT] ${taskId}: Creating shadow branch ${shadowBranch} from ${baseBranch}...`
-      );
-
-      const baseCommitSha = await gitService.createShadowBranch(
-        baseBranch,
-        shadowBranch
-      );
-
-      // Store base commit SHA in task
-      await prisma.task.update({
-        where: { id: taskId },
-        data: {
-          baseCommitSha,
-        },
-      });
-
-      console.log(`[TASK_INIT] ${taskId}: Git setup complete`);
-    } catch (error) {
-      console.error(`[TASK_INIT] ${taskId}: Failed to setup git:`, error);
-      throw error;
-    }
-  }
-
-  /**
    * Emit progress events via WebSocket
    */
   private emitProgress(taskId: string, progress: InitializationProgress): void {
@@ -557,10 +188,9 @@ export class TaskInitializationEngine {
   }
 
   /**
-   * Get default initialization steps based on agent mode
+   * Get default initialization steps for moru mode
    */
   async getDefaultStepsForTask(): Promise<InitStatus[]> {
-    const agentMode = getAgentMode();
-    return getStepsForMode(agentMode);
+    return MORU_INIT_STEPS;
   }
 }

@@ -1,7 +1,7 @@
 import { prisma } from "@repo/db";
-import { createToolExecutor, getAgentMode } from "../execution";
+import { createToolExecutor } from "../execution";
 import { TaskInitializationEngine } from "../initialization";
-import { getStepsForMode } from "@repo/types";
+import { MORU_INIT_STEPS } from "@repo/types";
 
 /**
  * Ensures task infrastructure exists and is healthy
@@ -12,14 +12,6 @@ export async function ensureTaskInfrastructureExists(
   userId: string
 ): Promise<void> {
   console.log(`[INFRA_CHECK] Checking infrastructure for task ${taskId}`);
-
-  // Local mode has persistent workspaces - no infrastructure validation needed
-  if (getAgentMode() === "local") {
-    console.log(
-      `[INFRA_CHECK] ${taskId}: Local mode - skipping infrastructure check`
-    );
-    return;
-  }
 
   try {
     // Step 1: Check if we have an active TaskSession
@@ -44,7 +36,7 @@ export async function ensureTaskInfrastructureExists(
       return;
     }
 
-    // Step 2: Check if the pod is actually healthy by trying to create a tool executor
+    // Step 2: Check if the sandbox is actually healthy by trying to create a tool executor
     try {
       const toolExecutor = await createToolExecutor(taskId);
 
@@ -52,7 +44,7 @@ export async function ensureTaskInfrastructureExists(
 
       if (!healthCheck.success) {
         console.log(
-          `[INFRA_CHECK] ${taskId}: Pod unhealthy (health check failed), re-initialization required`
+          `[INFRA_CHECK] ${taskId}: Sandbox unhealthy (health check failed), re-initialization required`
         );
         await triggerReinitialization(taskId, userId);
         return;
@@ -63,7 +55,7 @@ export async function ensureTaskInfrastructureExists(
       );
     } catch (error) {
       console.log(
-        `[INFRA_CHECK] ${taskId}: Pod inaccessible (${error instanceof Error ? error.message : "Unknown error"}), re-initialization required`
+        `[INFRA_CHECK] ${taskId}: Sandbox inaccessible (${error instanceof Error ? error.message : "Unknown error"}), re-initialization required`
       );
       await triggerReinitialization(taskId, userId);
       return;
@@ -103,11 +95,7 @@ async function triggerReinitialization(
   // Use TaskInitializationEngine for re-initialization
   const initEngine = new TaskInitializationEngine();
 
-  // Get steps for current agent mode
-  const agentMode = getAgentMode();
-  const steps = getStepsForMode(agentMode);
-
-  await initEngine.initializeTask(taskId, steps, userId);
+  await initEngine.initializeTask(taskId, MORU_INIT_STEPS, userId);
 
   console.log(
     `[INFRA_CHECK] ${taskId}: Re-initialization completed successfully`

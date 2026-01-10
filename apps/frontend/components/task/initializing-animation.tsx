@@ -1,10 +1,11 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { getStepsForMode, getStepDisplayName } from "@repo/types";
+import { MORU_INIT_STEPS, getStepDisplayName } from "@repo/types";
+import type { InitStatus } from "@repo/db";
 import { Check } from "lucide-react";
 import { LogoHover } from "../graphics/logo/logo-hover";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTaskStatus } from "@/hooks/tasks/use-task-status";
 import { useUserSettings } from "@/hooks/use-user-settings";
 
@@ -32,14 +33,8 @@ export default function InitializingAnimation({
     }
   }, [userMessageWrapperRef]);
 
-  const mode =
-    process.env.NEXT_PUBLIC_VERCEL_ENV === "production" ||
-    process.env.NEXT_PUBLIC_VERCEL_ENV === "preview"
-      ? "remote"
-      : "local";
-
-  // Get initialization steps for the current mode
-  const steps = useMemo(() => getStepsForMode(mode), [mode]);
+  // Use moru initialization steps (only mode now)
+  const steps: InitStatus[] = MORU_INIT_STEPS;
 
   let currentStepIndex = 0;
 
@@ -101,7 +96,7 @@ export default function InitializingAnimation({
                   size="sm"
                 />
               )}
-              {getStepDisplayName(step, userSettings)}
+              {getStepDisplayName(step)}
             </div>
           ))}
         </div>

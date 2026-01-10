@@ -1,18 +1,17 @@
 import { prisma } from "@repo/db";
-import {
-  CheckpointData,
-  MessageMetadata,
-} from "@repo/types";
+import { CheckpointData, MessageMetadata } from "@repo/types";
 import type { Todo } from "@repo/db";
 import { emitStreamChunk } from "../socket";
-import { createToolExecutor, createGitService } from "../execution";
-import { getFileSystemWatcher } from "../agent/tools";
+import { createToolExecutor } from "../execution";
+import { getMoruFilesystemWatcher } from "./moru-filesystem-watcher";
 import { buildTreeFromEntries } from "../files/build-tree";
-import config from "../config";
 
 /**
  * CheckpointService handles creating and restoring message-level checkpoints
  * for time-travel editing functionality
+ *
+ * Note: Git-related checkpoint functionality has been removed.
+ * This service now only handles todo state snapshots.
  */
 export class CheckpointService {
   /**
@@ -24,34 +23,13 @@ export class CheckpointService {
     );
 
     try {
-      // Create git service for the task (handles both local and remote modes)
-      console.log(`[CHECKPOINT] 🔧 Creating git service for task ${taskId}...`);
-      const gitService = await createGitService(taskId);
-
-      // 1. Ensure all changes are committed (reuse existing logic)
-      console.log(`[CHECKPOINT] 🔍 Checking for uncommitted changes...`);
-      const hasChanges = await gitService.hasChanges();
-      if (hasChanges) {
-        console.warn(
-          `[CHECKPOINT] ⚠️ Skipping checkpoint creation - workspace has uncommitted changes`
-        );
-        return; // Skip checkpoint if workspace is dirty
-      }
-
-      // 2. Capture current state
+      // Capture current todo state
       console.log(`[CHECKPOINT] 📸 Capturing current state...`);
-      const commitSha = await gitService.getCurrentCommitSha();
       const todoSnapshot = await this.getTodoSnapshot(taskId);
 
-      console.log(`[CHECKPOINT] 🎯 Captured commit SHA: ${commitSha}`);
       console.log(`[CHECKPOINT] 📝 Captured ${todoSnapshot.length} todos`);
-      if (todoSnapshot.length > 0) {
-        console.log(
-          `[CHECKPOINT] Todo statuses: ${todoSnapshot.map((t) => `${t.content.substring(0, 30)}... (${t.status})`).join(", ")}`
-        );
-      }
 
-      // 3. Get existing message metadata
+      // Get existing message metadata
       const existingMessage = await prisma.chatMessage.findUnique({
         where: { id: messageId },
         select: { metadata: true },
@@ -59,9 +37,9 @@ export class CheckpointService {
 
       const existingMetadata = existingMessage?.metadata || {};
 
-      // 4. Store checkpoint in message metadata
+      // Store checkpoint in message metadata
       const checkpointData: CheckpointData = {
-        commitSha,
+        commitSha: "", // No git, no commit SHA
         todoSnapshot,
         createdAt: new Date().toISOString(),
         workspaceState: "clean",
@@ -81,7 +59,7 @@ export class CheckpointService {
       });
 
       console.log(
-        `[CHECKPOINT] ✅ Successfully created checkpoint for message ${messageId} at commit ${commitSha}`
+        `[CHECKPOINT] ✅ Successfully created checkpoint for message ${messageId}`
       );
     } catch (error) {
       console.error(
@@ -104,7 +82,7 @@ export class CheckpointService {
     );
 
     try {
-      // 1. Find the most recent assistant message at or before target with checkpoint data
+      // Find the most recent assistant message at or before target with checkpoint data
       console.log(
         `[CHECKPOINT] 🔍 Looking for checkpoint message at or before target...`
       );
@@ -115,14 +93,13 @@ export class CheckpointService {
 
       if (!checkpointMessage?.metadata?.checkpoint) {
         console.log(
-          `[CHECKPOINT] 📍 No checkpoint found - restoring to initial repository state for message ${targetMessageId}`
+          `[CHECKPOINT] 📍 No checkpoint found - restoring to initial state for message ${targetMessageId}`
         );
         await this.restoreToInitialState(taskId);
         return;
       }
 
-      const checkpoint = checkpointMessage.metadata
-        .checkpoint as CheckpointData;
+      const checkpoint = checkpointMessage.metadata.checkpoint as CheckpointData;
 
       console.log(
         `[CHECKPOINT] 🎯 Found checkpoint from message ${checkpointMessage.id}`
@@ -130,55 +107,22 @@ export class CheckpointService {
       console.log(
         `[CHECKPOINT] 📅 Checkpoint created at: ${checkpoint.createdAt}`
       );
-      console.log(`[CHECKPOINT] 🎯 Target commit SHA: ${checkpoint.commitSha}`);
       console.log(
         `[CHECKPOINT] 📝 Checkpoint has ${checkpoint.todoSnapshot.length} todos`
       );
 
-      // Create git service for the task (handles both local and remote modes)
-      console.log(`[CHECKPOINT] 🔧 Creating git service for task ${taskId}...`);
-      const gitService = await createGitService(taskId);
-
-      // 2. Pause filesystem watcher to prevent spurious events from git operations
+      // Pause filesystem watcher to prevent spurious events
       await this.pauseFilesystemWatcher(taskId);
-
-      // 3. Handle uncommitted changes
-      console.log(`[CHECKPOINT] 🔍 Checking for uncommitted changes...`);
-      const hasChanges = await gitService.hasChanges();
-      if (hasChanges) {
-        console.warn(
-          `[CHECKPOINT] ⚠️ Uncommitted changes detected before checkpoint restoration. Git checkout will fail if these changes would be overwritten.`
-        );
-      } else {
-        console.log(
-          `[CHECKPOINT] ✨ Workspace is clean, proceeding with restore`
-        );
-      }
-
-      // 4. Restore git state
-      console.log(
-        `[CHECKPOINT] ⏪ Attempting git checkout to ${checkpoint.commitSha}...`
-      );
-      const success = await gitService.safeCheckoutCommit(checkpoint.commitSha);
-      if (!success) {
-        console.warn(
-          `[CHECKPOINT] ⚠️ Could not checkout to ${checkpoint.commitSha}, continuing with current state`
-        );
-      } else {
-        console.log(
-          `[CHECKPOINT] ✅ Successfully checked out to commit ${checkpoint.commitSha}`
-        );
-      }
 
       // Restore todo state
       await this.restoreTodoState(taskId, checkpoint.todoSnapshot);
       this.emitTodoUpdate(taskId, checkpoint.todoSnapshot);
 
-      // Wait for git state to settle, then recompute and emit file state
+      // Wait for state to settle, then recompute and emit file state
       await new Promise((resolve) => setTimeout(resolve, 150));
       await this.recomputeAndEmitFileState(taskId);
 
-      // Resume filesystem watcher after fs-override has been sent
+      // Resume filesystem watcher
       await new Promise((resolve) => setTimeout(resolve, 200));
       await this.resumeFilesystemWatcher(taskId);
 
@@ -260,10 +204,10 @@ export class CheckpointService {
         `[CHECKPOINT] 📊 Recomputing file state after restoration...`
       );
 
-      // Get task details for workspace path and base branch
+      // Get task details for workspace path
       const task = await prisma.task.findUnique({
         where: { id: taskId },
-        select: { workspacePath: true, baseBranch: true },
+        select: { workspacePath: true },
       });
 
       if (!task?.workspacePath) {
@@ -272,17 +216,6 @@ export class CheckpointService {
         );
         return;
       }
-
-      // Create git service and compute current file changes
-      console.log(`[CHECKPOINT] 📁 Computing file changes from GitService...`);
-      const gitService = await createGitService(taskId);
-      const { fileChanges, diffStats } = await gitService.getFileChanges(
-        task.baseBranch
-      );
-      console.log(`[CHECKPOINT] ✅ Found ${fileChanges.length} file changes`);
-      console.log(
-        `[CHECKPOINT] 📊 Diff stats: +${diffStats.additions} -${diffStats.deletions} (${diffStats.totalFiles} files)`
-      );
 
       // Get current codebase tree using tool executor
       console.log(`[CHECKPOINT] 🌳 Computing codebase tree...`);
@@ -295,23 +228,17 @@ export class CheckpointService {
 
       console.log(`[CHECKPOINT] ✅ Found ${codebaseTree.length} tree entries`);
 
-      // Emit fs-override event with complete file state
+      // Emit fs-override event with file state (no git diff stats)
       console.log(`[CHECKPOINT] 🔗 Emitting fs-override event to frontend...`);
       emitStreamChunk(
         {
           type: "fs-override",
           fsOverride: {
-            fileChanges: fileChanges.map((fc: any) => ({
-              filePath: fc.filePath,
-              operation: fc.operation,
-              additions: fc.additions,
-              deletions: fc.deletions,
-              createdAt: fc.createdAt,
-            })),
+            fileChanges: [],
             diffStats: {
-              additions: diffStats.additions,
-              deletions: diffStats.deletions,
-              totalFiles: diffStats.totalFiles,
+              additions: 0,
+              deletions: 0,
+              totalFiles: 0,
             },
             codebaseTree,
             message: "File state synchronized after checkpoint restoration",
@@ -321,7 +248,7 @@ export class CheckpointService {
       );
 
       console.log(
-        `[CHECKPOINT] ✅ Successfully emitted file state override with ${fileChanges.length} changes, ${codebaseTree.length} tree entries, and diff stats (+${diffStats.additions} -${diffStats.deletions})`
+        `[CHECKPOINT] ✅ Successfully emitted file state override with ${codebaseTree.length} tree entries`
       );
     } catch (error) {
       console.error(
@@ -374,66 +301,26 @@ export class CheckpointService {
   }
 
   /**
-   * Restore workspace to initial repository state (before any assistant changes)
+   * Restore workspace to initial state (before any assistant changes)
    */
   private async restoreToInitialState(taskId: string): Promise<void> {
     console.log(
-      `[CHECKPOINT] 🏁 Restoring to initial repository state for task ${taskId}`
+      `[CHECKPOINT] 🏁 Restoring to initial state for task ${taskId}`
     );
 
     try {
-      // Get task's initial commit SHA
-      const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        select: { baseCommitSha: true },
-      });
-
-      if (!task?.baseCommitSha) {
-        console.warn(
-          `[CHECKPOINT] ❌ Missing base commit SHA for task ${taskId}`
-        );
-        return;
-      }
-
-      console.log(
-        `[CHECKPOINT] 🎯 Target base commit SHA: ${task.baseCommitSha}`
-      );
-
-      // Create git service for the task (handles both local and remote modes)
-      console.log(`[CHECKPOINT] 🔧 Creating git service for task ${taskId}...`);
-      const gitService = await createGitService(taskId);
-
-      // Pause filesystem watcher to prevent spurious events from git operations
+      // Pause filesystem watcher to prevent spurious events
       await this.pauseFilesystemWatcher(taskId);
-
-      // Handle uncommitted changes
-      console.log(`[CHECKPOINT] 🔍 Checking for uncommitted changes...`);
-      const hasChanges = await gitService.hasChanges();
-      if (hasChanges) {
-        console.warn(
-          `[CHECKPOINT] ⚠️ Uncommitted changes detected before initial state restoration. Git checkout will fail if these changes would be overwritten.`
-        );
-      } else {
-        console.log(
-          `[CHECKPOINT] ✨ Workspace is clean, proceeding with restore`
-        );
-      }
-
-      // Restore git state to initial commit
-      const success = await gitService.safeCheckoutCommit(task.baseCommitSha);
-      if (!success) {
-        console.warn(`[CHECKPOINT] Could not checkout to initial commit`);
-      }
 
       // Clear all todos (initial state has none)
       await this.restoreTodoState(taskId, []); // Empty array = no todos
       this.emitTodoUpdate(taskId, []);
 
-      // Wait for git state to settle, then recompute and emit file state
+      // Wait for state to settle, then recompute and emit file state
       await new Promise((resolve) => setTimeout(resolve, 150));
       await this.recomputeAndEmitFileState(taskId);
 
-      // Resume filesystem watcher after fs-override has been sent
+      // Resume filesystem watcher
       await new Promise((resolve) => setTimeout(resolve, 200));
       await this.resumeFilesystemWatcher(taskId);
 
@@ -484,55 +371,13 @@ export class CheckpointService {
   }
 
   /**
-   * Pause filesystem watcher to prevent spurious events during git operations
+   * Pause filesystem watcher to prevent spurious events during operations
    */
   private async pauseFilesystemWatcher(taskId: string): Promise<void> {
     try {
-      if (config.agentMode === "local") {
-        // Local mode: pause the local filesystem watcher
-        const watcher = getFileSystemWatcher(taskId);
-        if (watcher) {
-          // Pause local watcher
-          watcher.pause();
-        } else {
-          // No local watcher found
-        }
-      } else {
-        // Remote mode: call sidecar API to pause watcher
-        const toolExecutor = await createToolExecutor(taskId);
-        try {
-          // Call sidecar API to pause filesystem watcher
-          // Access the sidecar URL using established pattern from codebase
-          const sidecarUrl = "sidecarUrl" in toolExecutor 
-            ? (toolExecutor as { sidecarUrl: string }).sidecarUrl 
-            : null;
-          if (!sidecarUrl) {
-            console.warn(`[CHECKPOINT] No sidecar URL available for task ${taskId}`);
-            return;
-          }
-          
-          const response = await fetch(`${sidecarUrl}/api/watcher/pause`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          });
-
-          if (response.ok) {
-            (await response.json()) as { message: string };
-            // Remote watcher paused successfully
-          } else {
-            const error = await response.text();
-            console.warn(
-              `[CHECKPOINT] Failed to pause remote watcher: ${error}`
-            );
-          }
-        } catch (error) {
-          console.warn(
-            `[CHECKPOINT] Failed to pause remote watcher for task ${taskId}:`,
-            error
-          );
-        }
+      const watcher = getMoruFilesystemWatcher(taskId);
+      if (watcher) {
+        watcher.pause();
       }
     } catch (error) {
       console.warn(
@@ -544,55 +389,13 @@ export class CheckpointService {
   }
 
   /**
-   * Resume filesystem watcher after git operations are complete
+   * Resume filesystem watcher after operations are complete
    */
   private async resumeFilesystemWatcher(taskId: string): Promise<void> {
     try {
-      if (config.agentMode === "local") {
-        // Local mode: resume the local filesystem watcher
-        const watcher = getFileSystemWatcher(taskId);
-        if (watcher) {
-          // Resume local watcher
-          watcher.resume();
-        } else {
-          // No local watcher found
-        }
-      } else {
-        // Resume remote watcher
-        const toolExecutor = await createToolExecutor(taskId);
-        try {
-          // Call sidecar API to resume filesystem watcher
-          // Access the sidecar URL using established pattern from codebase
-          const sidecarUrl = "sidecarUrl" in toolExecutor 
-            ? (toolExecutor as { sidecarUrl: string }).sidecarUrl 
-            : null;
-          if (!sidecarUrl) {
-            console.warn(`[CHECKPOINT] No sidecar URL available for task ${taskId}`);
-            return;
-          }
-          
-          const response = await fetch(`${sidecarUrl}/api/watcher/resume`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          });
-
-          if (response.ok) {
-            (await response.json()) as { message: string };
-            // Remote watcher resumed successfully
-          } else {
-            const error = await response.text();
-            console.warn(
-              `[CHECKPOINT] Failed to resume remote watcher: ${error}`
-            );
-          }
-        } catch (error) {
-          console.warn(
-            `[CHECKPOINT] Failed to resume remote watcher for task ${taskId}:`,
-            error
-          );
-        }
+      const watcher = getMoruFilesystemWatcher(taskId);
+      if (watcher) {
+        watcher.resume();
       }
     } catch (error) {
       console.warn(

@@ -14,8 +14,7 @@ import {
   FileSearchParamsSchema,
   DeleteFileParamsSchema,
 } from "@repo/types";
-import { createToolExecutor, isLocalMode } from "../../execution";
-import { LocalFileSystemWatcher } from "../../services/local-filesystem-watcher";
+import { createToolExecutor } from "../../execution";
 import { emitTerminalOutput, emitStreamChunk } from "../../socket";
 import type { TerminalEntry } from "@repo/types";
 import { MCPManager } from "../mcp/mcp-manager";
@@ -26,9 +25,6 @@ import {
 } from "@repo/types";
 
 const MAX_CONTEXT7_TOKENS = 4000;
-
-// Map to track active filesystem watchers by task ID
-const activeFileSystemWatchers = new Map<string, LocalFileSystemWatcher>();
 
 // Map to track MCP managers by task ID
 const activeMCPManagers = new Map<string, MCPManager>();
@@ -93,15 +89,6 @@ function createMCPToolWrapper(
 }
 
 /**
- * Get the active filesystem watcher for a task (local mode only)
- */
-export function getFileSystemWatcher(
-  taskId: string
-): LocalFileSystemWatcher | null {
-  return activeFileSystemWatchers.get(taskId) || null;
-}
-
-/**
  * Get the active MCP manager for a task
  */
 export function getMCPManager(taskId: string): MCPManager | null {
@@ -158,10 +145,7 @@ export async function createTools(taskId: string, workspacePath?: string) {
     `[TOOLS] Creating tools for task ${taskId} with workspace: ${workspacePath || "default"}${workspacePath ? " (task-specific)" : " (fallback)"}`
   );
 
-  // Create tool executor through abstraction layer
-  // The factory function is now smart enough to handle mode detection internally:
-  // - Local mode: uses workspacePath for filesystem operations
-  // - Remote mode: uses dynamic pod discovery to find actual running VMs
+  // Create tool executor through abstraction layer (uses Moru sandbox)
   const executor = await createToolExecutor(taskId, workspacePath);
 
   // Initialize MCP manager if enabled
@@ -183,26 +167,6 @@ export async function createTools(taskId: string, workspacePath?: string) {
       `[TOOLS] Failed to initialize MCP manager for task ${taskId}:`,
       error
     );
-  }
-
-  // Initialize filesystem watcher for local mode
-  if (isLocalMode() && workspacePath) {
-    // Check if we already have a watcher for this task
-    if (!activeFileSystemWatchers.has(taskId)) {
-      try {
-        const watcher = new LocalFileSystemWatcher(taskId);
-        watcher.startWatching(workspacePath);
-        activeFileSystemWatchers.set(taskId, watcher);
-        console.log(
-          `[TOOLS] Started local filesystem watcher for task ${taskId}`
-        );
-      } catch (error) {
-        console.error(
-          `[TOOLS] Failed to start filesystem watcher for task ${taskId}:`,
-          error
-        );
-      }
-    }
   }
 
   const baseTools = {
@@ -573,12 +537,15 @@ export async function createTools(taskId: string, workspacePath?: string) {
           // Build filter conditions
           const whereConditions: {
             userId: string;
-            repoFullName: string;
+            repoFullName?: string;
             category?: MemoryCategory;
           } = {
             userId: task.userId,
-            repoFullName: task.repoFullName,
           };
+
+          if (task.repoFullName) {
+            whereConditions.repoFullName = task.repoFullName;
+          }
 
           if (category) {
             whereConditions.category = category as MemoryCategory;
@@ -739,18 +706,6 @@ export async function createTools(taskId: string, workspacePath?: string) {
 }
 
 /**
- * Stop filesystem watcher for a specific task
- */
-export function stopFileSystemWatcher(taskId: string): void {
-  const watcher = activeFileSystemWatchers.get(taskId);
-  if (watcher) {
-    watcher.stop();
-    activeFileSystemWatchers.delete(taskId);
-    console.log(`[TOOLS] Stopped filesystem watcher for task ${taskId}`);
-  }
-}
-
-/**
  * Stop MCP manager for a specific task
  */
 export async function stopMCPManager(taskId: string): Promise<void> {
@@ -769,24 +724,6 @@ export async function stopMCPManager(taskId: string): Promise<void> {
       activeMCPManagers.delete(taskId);
     }
   }
-}
-
-/**
- * Stop all active filesystem watchers (for graceful shutdown)
- */
-export function stopAllFileSystemWatchers(): void {
-  console.log(
-    `[TOOLS] Stopping ${activeFileSystemWatchers.size} active filesystem watchers`
-  );
-
-  for (const [taskId, watcher] of Array.from(
-    activeFileSystemWatchers.entries()
-  )) {
-    watcher.stop();
-    console.log(`[TOOLS] Stopped filesystem watcher for task ${taskId}`);
-  }
-
-  activeFileSystemWatchers.clear();
 }
 
 /**
@@ -811,22 +748,6 @@ export async function stopAllMCPManagers(): Promise<void> {
 
   await Promise.allSettled(stopPromises);
   activeMCPManagers.clear();
-}
-
-/**
- * Get statistics about active filesystem watchers
- */
-export function getFileSystemWatcherStats() {
-  const stats = [];
-  for (const [_taskId, watcher] of Array.from(
-    activeFileSystemWatchers.entries()
-  )) {
-    stats.push(watcher.getStats());
-  }
-  return {
-    activeWatchers: activeFileSystemWatchers.size,
-    watcherDetails: stats,
-  };
 }
 
 /**

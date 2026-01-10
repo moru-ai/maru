@@ -1,8 +1,6 @@
 import { cleanupTaskStreamState, stopTerminalPolling } from "../socket";
-import {
-  stopFileSystemWatcher,
-  cleanupTaskTerminalCounters,
-} from "../agent/tools";
+import { cleanupTaskTerminalCounters } from "../agent/tools";
+import { stopMoruFilesystemWatcher } from "./moru-filesystem-watcher";
 import { chatService } from "../app";
 
 /**
@@ -13,14 +11,14 @@ export class MemoryCleanupService {
   /**
    * Clean up all memory structures associated with a task
    */
-  static cleanupTaskMemory(taskId: string): void {
+  static async cleanupTaskMemory(taskId: string): Promise<void> {
     console.log(`[MEMORY_CLEANUP] Starting memory cleanup for task ${taskId}`);
 
     try {
       chatService.cleanupTask(taskId);
       cleanupTaskStreamState(taskId);
       stopTerminalPolling(taskId);
-      stopFileSystemWatcher(taskId);
+      await stopMoruFilesystemWatcher(taskId);
       cleanupTaskTerminalCounters(taskId);
 
       console.log(

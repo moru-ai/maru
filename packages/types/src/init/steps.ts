@@ -1,5 +1,4 @@
 import type { InitStatus } from "@repo/db";
-import type { AgentMode } from "../tools/execution";
 
 /**
  * Human-readable display names for initialization steps
@@ -12,9 +11,8 @@ export const STEP_DISPLAY_NAMES: Record<InitStatus, string> = {
   VERIFY_VM_WORKSPACE: "Verifying Workspace",
   START_BACKGROUND_SERVICES: "Starting Background Services",
   INSTALL_DEPENDENCIES: "Installing Dependencies",
-  COMPLETE_SHADOW_WIKI: "Completing Setup", // Kept for backward compatibility
+  COMPLETE_SHADOW_WIKI: "Completing Setup",
   ACTIVE: "Active",
-  // Moru sandbox mode steps
   CREATE_SANDBOX: "Creating Sandbox",
   CLONE_REPOSITORY: "Cloning Repository",
   SETUP_GIT: "Setting Up Git",
@@ -28,18 +26,6 @@ export function getStepDisplayName(step: InitStatus): string {
 }
 
 /**
- * Get all step display names in execution order for a given mode
+ * Default initialization steps for moru mode
  */
-export function getStepsForMode(mode: AgentMode): InitStatus[] {
-  const steps: InitStatus[] = [];
-
-  if (mode === "moru") {
-    steps.push("CREATE_SANDBOX");
-  } else if (mode === "remote") {
-    steps.push("CREATE_VM", "WAIT_VM_READY", "VERIFY_VM_WORKSPACE");
-  } else {
-    steps.push("PREPARE_WORKSPACE");
-  }
-
-  return steps;
-}
+export const MORU_INIT_STEPS: InitStatus[] = ["CREATE_SANDBOX"];

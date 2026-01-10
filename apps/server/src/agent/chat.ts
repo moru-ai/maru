@@ -18,11 +18,8 @@ import { LLMService } from "./llm";
 import { getSystemPrompt, getShadowWikiMessage } from "./system-prompt";
 import { createTools, stopMCPManager } from "./tools";
 import type { ToolSet } from "ai";
-import { GitManager } from "../services/git-manager";
-import { PRManager } from "../services/pr-manager";
 import { modelContextService } from "../services/model-context-service";
 import { TaskModelContext } from "../services/task-model-context";
-import { checkpointService } from "../services/checkpoint-service";
 import { generateTaskTitleAndBranch } from "../utils/title-generation";
 import { MessageRole } from "@repo/db";
 import {
@@ -33,16 +30,14 @@ import {
   startStream,
   type TypedSocket,
 } from "../socket";
-import config from "../config";
-import { getGitHubAppEmail, getGitHubAppName } from "../config/shared";
 import {
   updateTaskStatus,
   updateTaskActivity,
   scheduleTaskCleanup,
   cancelTaskCleanup,
 } from "../utils/task-status";
-import { createGitService } from "../execution";
 import { memoryService } from "../services/memory-service";
+import { checkpointService } from "../services/checkpoint-service";
 import { TaskInitializationEngine } from "@/initialization";
 import { databaseBatchService } from "../services/database-batch-service";
 import { ChatSummarizationService } from "../services/chat-summarization-service";
@@ -229,288 +224,6 @@ export class ChatService {
     });
   }
 
-  /**
-   * Commit changes to git if there are any changes after an LLM response
-   */
-  private async commitChangesIfAny(
-    taskId: string,
-    context: TaskModelContext,
-    _workspacePath?: string
-  ): Promise<boolean> {
-    try {
-      // Get task info including user and workspace details
-      const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        include: { user: true },
-      });
-
-      if (!task) {
-        console.warn(`[CHAT] Task not found for git commit: ${taskId}`);
-        return false;
-      }
-
-      if (!task.shadowBranch) {
-        console.warn(
-          `[CHAT] No shadow branch configured for task ${taskId}, skipping git commit`
-        );
-        return false;
-      }
-
-      // Use unified git service for both local and remote modes
-      const gitService = await createGitService(taskId);
-
-      // Check if there are any uncommitted changes
-      const hasChanges = await gitService.hasChanges();
-      if (!hasChanges) {
-        console.log(`[CHAT] No changes to commit for task ${taskId}`);
-        return false;
-      }
-
-      // Get diff for commit message generation
-      const diff = await gitService.getDiff();
-
-      // Generate commit message using existing logic
-      let commitMessage = "Update code via Shadow agent";
-      if (diff) {
-        // Generate commit message using server-side GitManager (which has AI integration)
-        const tempGitManager = new GitManager("");
-        commitMessage = await tempGitManager.generateCommitMessage(
-          diff,
-          context
-        );
-      }
-
-      console.log(
-        `[CHAT] Generated commit message for task ${taskId}: "${commitMessage}"`
-      );
-
-      // Commit changes with Shadow as author and user as co-author
-      const commitResult = await gitService.commitChanges({
-        user: {
-          name: getGitHubAppName(config),
-          email: getGitHubAppEmail(config),
-        },
-        coAuthor: {
-          name: task.user.name,
-          email: task.user.email,
-        },
-        message: commitMessage,
-      });
-
-      if (!commitResult.success) {
-        console.error(
-          `[CHAT] Failed to commit changes for task ${taskId}: ${commitResult.message}`
-        );
-        return false;
-      }
-
-      console.log(`[CHAT] Successfully committed changes for task ${taskId}`);
-
-      // Push the commit to remote
-      try {
-        const pushResult = await gitService.pushBranch(
-          task.shadowBranch,
-          false
-        );
-        if (!pushResult.success) {
-          console.warn(
-            `[CHAT] Failed to push changes for task ${taskId}: ${pushResult.message}`
-          );
-          // Don't fail the operation - commit succeeded even if push failed
-        } else {
-          console.log(`[CHAT] Successfully pushed changes for task ${taskId}`);
-        }
-      } catch (pushError) {
-        console.warn(`[CHAT] Push failed for task ${taskId}:`, pushError);
-        // Don't throw - commit succeeded even if push failed
-      }
-
-      return true;
-    } catch (error) {
-      console.error(
-        `[CHAT] Failed to commit changes for task ${taskId}:`,
-        error
-      );
-      // Don't throw here - we don't want git failures to break the chat flow
-      return false;
-    }
-  }
-
-  /**
-   * Create a PR if needed after changes are committed
-   */
-  async createPRIfNeeded(
-    taskId: string,
-    workspacePath?: string,
-    messageId?: string,
-    context?: TaskModelContext
-  ): Promise<void> {
-    // Get or create context if not provided
-    let modelContext: TaskModelContext;
-    if (context) {
-      modelContext = context;
-    } else {
-      const taskContext = await modelContextService.getContextForTask(taskId);
-      if (!taskContext) {
-        console.warn(
-          `[CHAT] No model context available for task ${taskId}, skipping PR creation`
-        );
-        return;
-      }
-      modelContext = taskContext;
-    }
-
-    return this._createPRIfNeededInternal(
-      taskId,
-      workspacePath,
-      messageId,
-      modelContext
-    );
-  }
-
-  /**
-   * Internal method for PR creation
-   */
-  private async _createPRIfNeededInternal(
-    taskId: string,
-    workspacePath?: string,
-    messageId?: string,
-    context?: TaskModelContext
-  ): Promise<void> {
-    try {
-      const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        include: { user: true },
-      });
-
-      if (!task) {
-        console.warn(`[CHAT] Task not found for PR creation: ${taskId}`);
-        return;
-      }
-
-      if (!task.shadowBranch) {
-        console.warn(
-          `[CHAT] No shadow branch configured for task ${taskId}, skipping PR creation`
-        );
-        return;
-      }
-
-      const resolvedWorkspacePath = workspacePath || task.workspacePath;
-      if (!resolvedWorkspacePath) {
-        console.warn(
-          `[CHAT] No workspace path available for task ${taskId}, skipping PR creation`
-        );
-        return;
-      }
-
-      const gitService = await createGitService(taskId);
-      const prManager = new PRManager(gitService, this.llmService);
-
-      if (!messageId) {
-        console.warn(
-          `[CHAT] No messageId provided for PR creation for task ${taskId}`
-        );
-        return;
-      }
-
-      if (!context) {
-        console.warn(
-          `[CHAT] No context available for PR creation, skipping PR for task ${taskId}`
-        );
-        return;
-      }
-
-      await prManager.createPRIfNeeded(
-        {
-          taskId,
-          repoFullName: task.repoFullName,
-          shadowBranch: task.shadowBranch,
-          baseBranch: task.baseBranch,
-          userId: task.userId,
-          taskTitle: task.title,
-          wasTaskCompleted: task.status === "COMPLETED",
-          messageId,
-        },
-        context
-      );
-    } catch (error) {
-      console.error(`[CHAT] Failed to create PR for task ${taskId}:`, error);
-      // Non-blocking - don't throw
-    }
-  }
-
-  /**
-   * Create a PR if user has auto-PR enabled and changes are committed
-   */
-  private async createPRIfUserEnabled(
-    taskId: string,
-    workspacePath?: string,
-    messageId?: string,
-    context?: TaskModelContext
-  ): Promise<void> {
-    try {
-      const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        include: {
-          user: {
-            include: {
-              userSettings: true,
-            },
-          },
-        },
-      });
-
-      if (!task) {
-        console.warn(`[CHAT] Task not found for PR creation: ${taskId}`);
-        return;
-      }
-
-      // Check if user has auto-PR enabled (default to true if no settings exist)
-      const autoPREnabled = task.user.userSettings?.autoPullRequest ?? true;
-
-      if (!autoPREnabled) {
-        return;
-      }
-
-      if (!messageId) {
-        console.warn(
-          `[CHAT] No messageId provided for auto-PR creation for task ${taskId}`
-        );
-        return;
-      }
-
-      // Emit in-progress event before starting PR creation
-      emitToTask(taskId, "auto-pr-status", {
-        taskId,
-        messageId,
-        status: "in-progress" as const,
-      });
-
-      // Use the existing createPRIfNeeded method
-      await this.createPRIfNeeded(taskId, workspacePath, messageId, context);
-    } catch (error) {
-      console.error(
-        `[CHAT] Failed to check user auto-PR setting for task ${taskId}:`,
-        error
-      );
-
-      // Emit failure event if messageId is available
-      if (messageId) {
-        emitToTask(taskId, "auto-pr-status", {
-          taskId,
-          messageId,
-          status: "failed" as const,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to create pull request",
-        });
-      }
-
-      // Non-blocking - don't throw
-    }
-  }
-
   async getChatHistory(taskId: string): Promise<Message[]> {
     const dbMessages = await prisma.chatMessage.findMany({
       where: { taskId },
@@ -540,7 +253,14 @@ export class ChatService {
       metadata: msg.metadata as MessageMetadata | undefined,
       pullRequestSnapshot: msg.pullRequestSnapshot || undefined,
       stackedTaskId: msg.stackedTaskId || undefined,
-      stackedTask: msg.stackedTask || undefined,
+      stackedTask: msg.stackedTask
+        ? {
+            id: msg.stackedTask.id,
+            title: msg.stackedTask.title,
+            shadowBranch: msg.stackedTask.shadowBranch ?? undefined,
+            status: msg.stackedTask.status,
+          }
+        : undefined,
     }));
   }
 
@@ -550,7 +270,7 @@ export class ChatService {
   private async handleFollowUpLogic(
     taskId: string,
     userId: string,
-    context: TaskModelContext
+    _context: TaskModelContext
   ): Promise<void> {
     try {
       // Always cancel any scheduled cleanup when user sends follow-up message
@@ -1208,39 +928,6 @@ These are specific instructions from the user that should be followed throughout
 
         // Update task activity timestamp when assistant completes response
         await updateTaskActivity(taskId, "CHAT");
-
-        // Commit changes if there are any (only for successfully completed responses)
-        try {
-          const changesCommitted = await this.commitChangesIfAny(
-            taskId,
-            context,
-            workspacePath
-          );
-
-          // Create PR if changes were committed and user has auto-PR enabled
-          if (changesCommitted && assistantMessageId) {
-            await this.createPRIfUserEnabled(
-              taskId,
-              workspacePath,
-              assistantMessageId,
-              context
-            );
-          }
-
-          // Create checkpoint after successful completion and commit
-          if (changesCommitted && assistantMessageId) {
-            await checkpointService.createCheckpoint(
-              taskId,
-              assistantMessageId
-            );
-          }
-        } catch (error) {
-          console.error(
-            `[CHAT] Failed to commit changes for task ${taskId}:`,
-            error
-          );
-          // Don't fail the entire response for git commit failures
-        }
       }
 
       // Clean up stream tracking

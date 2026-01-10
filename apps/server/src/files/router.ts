@@ -1,8 +1,7 @@
 import { Router } from "express";
 import { prisma } from "@repo/db";
 import { FILE_SIZE_LIMITS } from "@repo/types";
-import { createWorkspaceManager, createGitService } from "../execution";
-import { getGitHubFileChanges } from "../utils/github-file-changes";
+import { createWorkspaceManager } from "../execution";
 import { buildFileTree } from "./build-tree";
 
 const router = Router();
@@ -153,24 +152,17 @@ router.get("/:taskId/files/content", async (req, res) => {
   }
 });
 
-// GET /api/tasks/:taskId/file-changes - Get git-based file changes
+// GET /api/tasks/:taskId/file-changes - Get file changes (git functionality removed)
 router.get("/:taskId/file-changes", async (req, res) => {
-  const startTime = Date.now();
   try {
     const { taskId } = req.params;
 
-    // Validate task exists and get full status
+    // Validate task exists
     const task = await prisma.task.findUnique({
       where: { id: taskId },
       select: {
         id: true,
-        workspacePath: true,
         status: true,
-        baseBranch: true,
-        shadowBranch: true,
-        repoFullName: true,
-        initStatus: true,
-        userId: true,
       },
     });
 
@@ -181,71 +173,15 @@ router.get("/:taskId/file-changes", async (req, res) => {
       });
     }
 
-    // Don't return file changes if task is still initializing
-    if (task.status === "INITIALIZING") {
-      return res.json({
-        success: true,
-        fileChanges: [],
-        diffStats: { additions: 0, deletions: 0, totalFiles: 0 },
-      });
-    }
-
-    // If task workspace is INACTIVE (cleaned up), use GitHub API
-    if (task.initStatus === "INACTIVE") {
-      if (!task.repoFullName || !task.shadowBranch) {
-        return res.json({
-          success: true,
-          fileChanges: [],
-          diffStats: { additions: 0, deletions: 0, totalFiles: 0 },
-        });
-      }
-
-      const { fileChanges, diffStats } = await getGitHubFileChanges(
-        task.repoFullName,
-        task.baseBranch,
-        task.shadowBranch,
-        task.userId
-      );
-
-      return res.json({
-        success: true,
-        fileChanges,
-        diffStats,
-      });
-    }
-
-    // For ACTIVE tasks, use GitService abstraction (handles both local and remote modes)
-    try {
-      const gitService = await createGitService(taskId);
-
-      const { fileChanges, diffStats } = await gitService.getFileChanges(
-        task.baseBranch
-      );
-
-      res.json({
-        success: true,
-        fileChanges,
-        diffStats,
-      });
-      return;
-    } catch (error) {
-      console.error(
-        `[FILE_CHANGES_DEBUG] GitService error - taskId: ${taskId}:`,
-        error
-      );
-
-      // Fallback to empty response on error
-      res.json({
-        success: true,
-        fileChanges: [],
-        diffStats: { additions: 0, deletions: 0, totalFiles: 0 },
-      });
-      return;
-    }
+    // Git functionality has been removed, return empty changes
+    res.json({
+      success: true,
+      fileChanges: [],
+      diffStats: { additions: 0, deletions: 0, totalFiles: 0 },
+    });
   } catch (error) {
-    const duration = Date.now() - startTime;
     console.error(
-      `[FILE_CHANGES_DEBUG] Error in file-changes route - taskId: ${req.params.taskId}, duration: ${duration}ms`,
+      `[FILE_CHANGES_DEBUG] Error in file-changes route - taskId: ${req.params.taskId}`,
       error
     );
     res.status(500).json({

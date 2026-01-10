@@ -32,7 +32,14 @@ export async function getTaskMessages(taskId: string): Promise<Message[]> {
       metadata: (msg.metadata as any) || { isStreaming: false },
       pullRequestSnapshot: msg.pullRequestSnapshot || undefined,
       stackedTaskId: msg.stackedTaskId || undefined,
-      stackedTask: msg.stackedTask || undefined,
+      stackedTask: msg.stackedTask
+        ? {
+            id: msg.stackedTask.id,
+            title: msg.stackedTask.title,
+            shadowBranch: msg.stackedTask.shadowBranch ?? undefined,
+            status: msg.stackedTask.status,
+          }
+        : undefined,
     }));
 
     return finalMessages;

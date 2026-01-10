@@ -1,5 +1,5 @@
 import { prisma } from "@repo/db";
-import { createWorkspaceManager, isVMMode } from "../execution";
+import { createWorkspaceManager } from "../execution";
 import { MemoryCleanupService } from "./memory-cleanup";
 
 export class TaskCleanupService {
@@ -8,14 +8,8 @@ export class TaskCleanupService {
 
   /**
    * Start the background cleanup service
-   * Only runs in VM modes (remote and moru)
    */
   start(): void {
-    // Only run cleanup in VM modes (remote and moru)
-    if (!isVMMode()) {
-      return;
-    }
-
     this.processStartupCleanup();
 
     this.interval = setInterval(async () => {
