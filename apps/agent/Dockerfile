@@ -27,3 +27,7 @@ RUN git config --system init.defaultBranch main && \
 # Create workspace
 RUN mkdir -p /workspace && chmod 777 /workspace
 WORKDIR /workspace
+
+# Copy Claude Code instructions
+RUN mkdir -p /home/user/.claude
+COPY INSTRUCTIONS.md /home/user/.claude/CLAUDE.md

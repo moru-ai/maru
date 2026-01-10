@@ -7,6 +7,36 @@
 npm run dev
 ```
 
+## Agent Template
+
+The agent runs inside a Moru sandbox VM. The template is defined in `apps/agent/`.
+
+### Build Template
+
+```bash
+cd apps/agent
+.venv/bin/python template.py
+```
+
+This builds the Docker image and registers it as the `claude-agent` template.
+
+### Template Files
+
+- `apps/agent/Dockerfile` - Container definition
+- `apps/agent/INSTRUCTIONS.md` - Claude Code instructions (copied to `/home/user/.claude/CLAUDE.md` in the container)
+- `apps/agent/src/` - Agent source code
+- `apps/agent/template.py` - Template build script
+
+### Environment
+
+Copy `.env.example` to `.env` in `apps/agent/`:
+
+```bash
+cp apps/agent/.env.example apps/agent/.env
+```
+
+Then set your `MORU_API_KEY`.
+
 - Frontend: http://localhost:3000
 - Backend: http://localhost:4000
 
