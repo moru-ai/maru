@@ -77,14 +77,5 @@ export function generateToolGuidance(availableTools?: ToolSet): string {
 ## Tool Usage Patterns & Examples
 
 ${toolSections.join("\n\n")}
-
-### add_memory
-${readToolInstructions("add_memory")}
-
-### list_memories
-${readToolInstructions("list_memories")}
-
-### remove_memory
-${readToolInstructions("remove_memory")}
 </tool_guidance>`;
 }

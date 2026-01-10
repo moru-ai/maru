@@ -2,44 +2,11 @@ import { getModelProvider } from "../llm/models";
 import type { ApiKeys } from "../api-keys";
 import type { ModelType } from "../llm/models";
 
-const WORD_LIMIT = 8;
-
 export function cleanTitle(title: string): string {
   return title
     .trim()
     .replace(/^[`"']|[`"']$/g, "") // Remove leading/trailing quotes or backticks
     .replace(/[`"']/g, ""); // Remove any remaining quotes or backticks within the string
-}
-
-export function generateRandomSuffix(length: number): string {
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "";
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
-export function generateShadowBranchName(
-  title: string,
-  taskId: string
-): string {
-  const branchSafeTitle = title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "") // Remove special chars except spaces and hyphens
-    .trim()
-    .split(/\s+/) // Split by whitespace
-    .slice(0, WORD_LIMIT) // Limit words
-    .join("-") // Join with hyphens
-    .replace(/-+/g, "-") // Replace multiple hyphens with single
-    .replace(/^-|-$/g, ""); // Remove leading/trailing hyphens
-  const randomSuffix = generateRandomSuffix(6);
-
-  if (branchSafeTitle) {
-    return `shadow/${branchSafeTitle}-${randomSuffix}`;
-  } else {
-    return `shadow/task-${taskId}`;
-  }
 }
 
 export interface TitleGenerationConfig {

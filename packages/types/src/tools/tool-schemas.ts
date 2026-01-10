@@ -142,55 +142,6 @@ export const WebSearchParamsSchema = z
   })
   .merge(ExplanationSchema);
 
-export const AddMemoryParamsSchema = z.object({
-  content: z.string().describe("Concise memory content to store"),
-  category: z
-    .enum([
-      "INFRA",
-      "SETUP",
-      "STYLES",
-      "ARCHITECTURE",
-      "TESTING",
-      "PATTERNS",
-      "BUGS",
-      "PERFORMANCE",
-      "CONFIG",
-      "GENERAL",
-    ])
-    .describe("Category for organizing the memory"),
-  explanation: z
-    .string()
-    .describe("One sentence explanation for why this memory is being added"),
-});
-
-export const ListMemoriesParamsSchema = z.object({
-  category: z
-    .enum([
-      "INFRA",
-      "SETUP",
-      "STYLES",
-      "ARCHITECTURE",
-      "TESTING",
-      "PATTERNS",
-      "BUGS",
-      "PERFORMANCE",
-      "CONFIG",
-      "GENERAL",
-    ])
-    .optional()
-    .describe("Optional category filter"),
-  explanation: z
-    .string()
-    .describe("One sentence explanation for why memories are being listed"),
-});
-
-export const RemoveMemoryParamsSchema = z.object({
-  memoryId: z.string().describe("ID of the memory to remove"),
-  explanation: z
-    .string()
-    .describe("One sentence explanation for why this memory is being removed"),
-});
-
 // === Tool Result Schemas ===
 export const TodoWriteResultSchema = BaseResultSchema.extend({
   todos: z
@@ -291,44 +242,6 @@ export const WebSearchResultSchema = BaseResultSchema.extend({
   domain: z.string().optional(),
 });
 
-export const AddMemoryResultSchema = BaseResultSchema.extend({
-  memory: z
-    .object({
-      id: z.string(),
-      content: z.string(),
-      category: z.string(),
-      repoFullName: z.string(),
-      createdAt: z.date(),
-    })
-    .optional(),
-});
-
-export const ListMemoriesResultSchema = BaseResultSchema.extend({
-  memories: z
-    .array(
-      z.object({
-        id: z.string(),
-        content: z.string(),
-        category: z.string(),
-        repoFullName: z.string(),
-        createdAt: z.date(),
-      })
-    )
-    .optional(),
-  memoriesByCategory: z.record(z.array(z.any())).optional(),
-  totalCount: z.number().optional(),
-});
-
-export const RemoveMemoryResultSchema = BaseResultSchema.extend({
-  removedMemory: z
-    .object({
-      id: z.string(),
-      content: z.string(),
-      category: z.string(),
-    })
-    .optional(),
-});
-
 export const CommandResultSchema = BaseResultSchema.extend({
   stdout: z.string().optional(),
   stderr: z.string().optional(),
@@ -360,9 +273,6 @@ export type GrepSearchParams = z.infer<typeof GrepSearchParamsSchema>;
 export type FileSearchParams = z.infer<typeof FileSearchParamsSchema>;
 export type DeleteFileParams = z.infer<typeof DeleteFileParamsSchema>;
 export type WebSearchParams = z.infer<typeof WebSearchParamsSchema>;
-export type AddMemoryParams = z.infer<typeof AddMemoryParamsSchema>;
-export type ListMemoriesParams = z.infer<typeof ListMemoriesParamsSchema>;
-export type RemoveMemoryParams = z.infer<typeof RemoveMemoryParamsSchema>;
 
 export type TodoWriteResult = z.infer<typeof TodoWriteResultSchema>;
 export type FileResult = z.infer<typeof FileResultSchema>;
@@ -382,9 +292,6 @@ export type GrepResult = z.infer<typeof GrepResultSchema>;
 export type WebSearchResult = z.infer<typeof WebSearchResultSchema>;
 export type CommandResult = z.infer<typeof CommandResultSchema>;
 export type FileStatsResult = z.infer<typeof FileStatsResultSchema>;
-export type AddMemoryResult = z.infer<typeof AddMemoryResultSchema>;
-export type ListMemoriesResult = z.infer<typeof ListMemoriesResultSchema>;
-export type RemoveMemoryResult = z.infer<typeof RemoveMemoryResultSchema>;
 
 // === Tool Schema Map ===
 export const ToolResultSchemas = {
@@ -398,9 +305,6 @@ export const ToolResultSchemas = {
   file_search: FileSearchResultSchema,
   web_search: WebSearchResultSchema,
   delete_file: DeleteResultSchema,
-  add_memory: AddMemoryResultSchema,
-  list_memories: ListMemoriesResultSchema,
-  remove_memory: RemoveMemoryResultSchema,
 } as const;
 
 export type ToolName = keyof typeof ToolResultSchemas;
@@ -416,10 +320,7 @@ export type ToolResultTypes =
   | { toolName: "grep_search"; result: GrepResult }
   | { toolName: "file_search"; result: FileSearchResult }
   | { toolName: "web_search"; result: WebSearchResult }
-  | { toolName: "delete_file"; result: DeleteResult }
-  | { toolName: "add_memory"; result: AddMemoryResult }
-  | { toolName: "list_memories"; result: ListMemoriesResult }
-  | { toolName: "remove_memory"; result: RemoveMemoryResult };
+  | { toolName: "delete_file"; result: DeleteResult };
 
 // Extended type that includes validation errors
 export type ToolResultTypesWithValidation = ToolResultTypes & {
@@ -437,9 +338,6 @@ export enum ToolTypes {
   WEB_SEARCH = "web_search",
   TODO_WRITE = "todo_write",
   RUN_TERMINAL_CMD = "run_terminal_cmd",
-  ADD_MEMORY = "add_memory",
-  LIST_MEMORIES = "list_memories",
-  REMOVE_MEMORY = "remove_memory",
   REASONING = "reasoning",
   REDACTED_REASONING = "redacted-reasoning",
   MCP = "mcp",
@@ -457,9 +355,6 @@ export const TOOL_PREFIXES: Record<ToolTypes, string> = {
   [ToolTypes.WEB_SEARCH]: "Web search",
   [ToolTypes.TODO_WRITE]: "Update todo list",
   [ToolTypes.RUN_TERMINAL_CMD]: "Run",
-  [ToolTypes.ADD_MEMORY]: "Add memory",
-  [ToolTypes.LIST_MEMORIES]: "List memories",
-  [ToolTypes.REMOVE_MEMORY]: "Remove memory",
   [ToolTypes.REASONING]: "Reasoning",
   [ToolTypes.REDACTED_REASONING]: "Reasoning",
   [ToolTypes.MCP]: "MCP", // This will be overridden with server name

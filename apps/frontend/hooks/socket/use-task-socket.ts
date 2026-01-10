@@ -5,13 +5,11 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { extractStreamingArgs } from "@/lib/streaming-args";
 import { useStreamingPartsMap } from "./use-streaming-parts-map";
 import { useQueryClient } from "@tanstack/react-query";
-import { generateTaskId } from "@repo/types";
 import type {
   AssistantMessagePart,
   Message,
   StreamChunk,
   TaskStatusUpdateEvent,
-  AutoPRStatusEvent,
   ModelType,
   FileNode,
   QueuedActionUI,
@@ -241,11 +239,6 @@ export function useTaskSocket(taskId: string | undefined) {
   const streamingParts = useStreamingPartsMap();
   const [streamingPartsOrder, setStreamingPartsOrder] = useState<string[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-
-  // Auto-PR state management
-  const [autoPRStatus, setAutoPRStatus] = useState<AutoPRStatusEvent | null>(
-    null
-  );
 
   // Stream completion state to prevent race condition
   const [isCompletionPending, setIsCompletionPending] = useState(false);
@@ -866,12 +859,9 @@ export function useTaskSocket(taskId: string | undefined) {
 
     function onQueuedActionProcessing(data: {
       taskId: string;
-      type: "message" | "stacked-pr";
+      type: "message";
       message: string;
       model: ModelType;
-      shadowBranch?: string;
-      title?: string;
-      newTaskId?: string;
     }) {
       if (data.taskId === taskId) {
         const optimisticMessage: Message = {
@@ -881,15 +871,6 @@ export function useTaskSocket(taskId: string | undefined) {
           llmModel: data.model,
           createdAt: new Date().toISOString(),
           metadata: { isStreaming: false },
-          pullRequestSnapshot: undefined,
-          ...(data.type === "stacked-pr" &&
-            data.shadowBranch && {
-              stackedTask: {
-                id: data.newTaskId || "temp",
-                title: data.title || data.message.trim(),
-                shadowBranch: data.shadowBranch,
-              },
-            }),
         };
 
         queryClient.setQueryData<Message[]>(
@@ -975,48 +956,6 @@ export function useTaskSocket(taskId: string | undefined) {
       }
     }
 
-    function onAutoPRStatus(data: AutoPRStatusEvent) {
-      if (data.taskId === taskId) {
-        setAutoPRStatus(data);
-
-        // Handle different auto-PR statuses
-        switch (data.status) {
-          case "completed":
-            // Optimistically update task with PR number if provided
-            if (data.prNumber) {
-              queryClient.setQueryData(
-                ["task", taskId],
-                (oldData: TaskWithDetails) => {
-                  if (oldData && oldData.task) {
-                    return {
-                      ...oldData,
-                      task: {
-                        ...oldData.task,
-                        pullRequestNumber: data.prNumber,
-                      },
-                    };
-                  }
-                  return oldData;
-                }
-              );
-            }
-            // Clear the auto-PR status after a short delay to allow UI transition
-            setTimeout(() => setAutoPRStatus(null), 2000);
-            break;
-
-          case "failed":
-            // Show error toast and clear status
-            if (typeof window !== "undefined") {
-              import("sonner").then(({ toast }) => {
-                toast.error(data.error || "Failed to create pull request");
-              });
-            }
-            setTimeout(() => setAutoPRStatus(null), 1000);
-            break;
-        }
-      }
-    }
-
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("chat-history", onChatHistory);
@@ -1027,7 +966,6 @@ export function useTaskSocket(taskId: string | undefined) {
     socket.on("message-error", onMessageError);
     socket.on("queued-action-processing", onQueuedActionProcessing);
     socket.on("task-status-updated", onTaskStatusUpdate);
-    socket.on("auto-pr-status", onAutoPRStatus);
 
     return () => {
       socket.off("connect", onConnect);
@@ -1040,7 +978,6 @@ export function useTaskSocket(taskId: string | undefined) {
       socket.off("message-error", onMessageError);
       socket.off("queued-action-processing", onQueuedActionProcessing);
       socket.off("task-status-updated", onTaskStatusUpdate);
-      socket.off("auto-pr-status", onAutoPRStatus);
     };
   }, [socket, taskId, queryClient]);
 
@@ -1072,23 +1009,6 @@ export function useTaskSocket(taskId: string | undefined) {
     socket.emit("clear-queued-action", { taskId });
   }, [socket, taskId]);
 
-  const createStackedPR = useCallback(
-    (message: string, model: string, queue: boolean = false) => {
-      if (!socket || !taskId || !message.trim()) return;
-
-      const newTaskId = generateTaskId();
-
-      socket.emit("create-stacked-pr", {
-        taskId,
-        message: message.trim(),
-        llmModel: model as ModelType,
-        queue,
-        newTaskId,
-      });
-    },
-    [socket, taskId]
-  );
-
   return {
     isConnected,
     streamingPartsMap: streamingParts.map,
@@ -1096,10 +1016,8 @@ export function useTaskSocket(taskId: string | undefined) {
     isStreaming,
     setIsStreaming,
     isCompletionPending,
-    autoPRStatus,
     sendMessage,
     stopStream,
     clearQueuedAction,
-    createStackedPR,
   };
 }

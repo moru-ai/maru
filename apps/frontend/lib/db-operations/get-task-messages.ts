@@ -5,17 +5,6 @@ export async function getTaskMessages(taskId: string): Promise<Message[]> {
   try {
     const messages = await db.chatMessage.findMany({
       where: { taskId },
-      include: {
-        pullRequestSnapshot: true,
-        stackedTask: {
-          select: {
-            id: true,
-            title: true,
-            shadowBranch: true,
-            status: true,
-          },
-        },
-      },
       orderBy: [
         { sequence: "asc" }, // Primary ordering by sequence for correct conversation flow
         { createdAt: "asc" }, // Fallback ordering by timestamp
@@ -30,16 +19,6 @@ export async function getTaskMessages(taskId: string): Promise<Message[]> {
       llmModel: msg.llmModel,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       metadata: (msg.metadata as any) || { isStreaming: false },
-      pullRequestSnapshot: msg.pullRequestSnapshot || undefined,
-      stackedTaskId: msg.stackedTaskId || undefined,
-      stackedTask: msg.stackedTask
-        ? {
-            id: msg.stackedTask.id,
-            title: msg.stackedTask.title,
-            shadowBranch: msg.stackedTask.shadowBranch ?? undefined,
-            status: msg.stackedTask.status,
-          }
-        : undefined,
     }));
 
     return finalMessages;

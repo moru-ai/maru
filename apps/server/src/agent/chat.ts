@@ -9,26 +9,22 @@ import {
   QueuedActionUI,
   ReasoningPart,
   RedactedReasoningPart,
-  generateTaskId,
 } from "@repo/types";
 import { TextPart, ToolCallPart, ToolResultPart } from "ai";
 import { randomUUID } from "crypto";
 import { type ChatMessage } from "../../../../packages/db/src/client";
 import { LLMService } from "./llm";
-import { getSystemPrompt, getShadowWikiMessage } from "./system-prompt";
+import { getSystemPrompt } from "./system-prompt";
 import { createTools, stopMCPManager } from "./tools";
 import type { ToolSet } from "ai";
 import { modelContextService } from "../services/model-context-service";
 import { TaskModelContext } from "../services/task-model-context";
-import { generateTaskTitleAndBranch } from "../utils/title-generation";
-import { MessageRole } from "@repo/db";
 import {
   emitStreamChunk,
   emitToTask,
   endStream,
   handleStreamError,
   startStream,
-  type TypedSocket,
 } from "../socket";
 import {
   updateTaskStatus,
@@ -36,11 +32,9 @@ import {
   scheduleTaskCleanup,
   cancelTaskCleanup,
 } from "../utils/task-status";
-import { memoryService } from "../services/memory-service";
 import { checkpointService } from "../services/checkpoint-service";
 import { TaskInitializationEngine } from "@/initialization";
 import { databaseBatchService } from "../services/database-batch-service";
-import { ChatSummarizationService } from "../services/chat-summarization-service";
 
 // Discriminated union types for queued actions
 type QueuedMessageAction = {
@@ -52,19 +46,7 @@ type QueuedMessageAction = {
   };
 };
 
-type QueuedStackedPRAction = {
-  type: "stacked-pr";
-  data: {
-    message: string;
-    parentTaskId: string;
-    model: ModelType;
-    userId: string;
-    socket: TypedSocket;
-    newTaskId?: string;
-  };
-};
-
-type QueuedAction = QueuedMessageAction | QueuedStackedPRAction;
+type QueuedAction = QueuedMessageAction;
 
 export class ChatService {
   private llmService: LLMService;
@@ -227,17 +209,6 @@ export class ChatService {
   async getChatHistory(taskId: string): Promise<Message[]> {
     const dbMessages = await prisma.chatMessage.findMany({
       where: { taskId },
-      include: {
-        pullRequestSnapshot: true,
-        stackedTask: {
-          select: {
-            id: true,
-            title: true,
-            shadowBranch: true,
-            status: true,
-          },
-        },
-      },
       orderBy: [
         { sequence: "asc" }, // Primary ordering by sequence
         { createdAt: "asc" }, // Fallback ordering by timestamp
@@ -251,16 +222,6 @@ export class ChatService {
       llmModel: msg.llmModel,
       createdAt: msg.createdAt.toISOString(),
       metadata: msg.metadata as MessageMetadata | undefined,
-      pullRequestSnapshot: msg.pullRequestSnapshot || undefined,
-      stackedTaskId: msg.stackedTaskId || undefined,
-      stackedTask: msg.stackedTask
-        ? {
-            id: msg.stackedTask.id,
-            title: msg.stackedTask.title,
-            shadowBranch: msg.stackedTask.shadowBranch ?? undefined,
-            status: msg.stackedTask.status,
-          }
-        : undefined,
     }));
   }
 
@@ -432,7 +393,7 @@ export class ChatService {
       .slice(0, -1)
       .filter(
         (msg) =>
-          (msg.role === "user" && !msg.stackedTaskId) ||
+          msg.role === "user" ||
           msg.role === "assistant" ||
           msg.role === "system"
       );
@@ -441,25 +402,6 @@ export class ChatService {
 
     if (isFirstMessage) {
       const systemMessagesToAdd: Message[] = [];
-
-      const shadowWikiContent = await getShadowWikiMessage(taskId);
-      if (shadowWikiContent) {
-        const shadowWikiSequence = await this.getNextSequence(taskId);
-        await this.saveSystemMessage(
-          taskId,
-          shadowWikiContent,
-          context.getMainModel(),
-          shadowWikiSequence
-        );
-
-        systemMessagesToAdd.push({
-          id: randomUUID(),
-          role: "system",
-          content: shadowWikiContent,
-          createdAt: new Date().toISOString(),
-          llmModel: context.getMainModel(),
-        });
-      }
 
       const task = await prisma.task.findUnique({
         where: { id: taskId },
@@ -471,32 +413,6 @@ export class ChatService {
           },
         },
       });
-
-      const memoriesEnabled = task?.user.userSettings?.memoriesEnabled ?? true;
-
-      if (memoriesEnabled) {
-        const memoryContext = await memoryService.getMemoriesForTask(taskId);
-        if (memoryContext && memoryContext.memories.length > 0) {
-          const memoryContent =
-            memoryService.formatMemoriesForPrompt(memoryContext);
-
-          const memorySequence = await this.getNextSequence(taskId);
-          await this.saveSystemMessage(
-            taskId,
-            memoryContent,
-            context.getMainModel(),
-            memorySequence
-          );
-
-          systemMessagesToAdd.push({
-            id: randomUUID(),
-            role: "system",
-            content: memoryContent,
-            createdAt: new Date().toISOString(),
-            llmModel: context.getMainModel(),
-          });
-        }
-      }
 
       // Add Rules section if available
       const userRules = task?.user.userSettings?.rules;
@@ -1007,9 +923,6 @@ These are specific instructions from the user that should be followed throughout
           });
           await this._processQueuedMessage(queuedAction.data, taskId);
           break;
-        case "stacked-pr":
-          await this._processQueuedStackedPR(queuedAction.data);
-          break;
       }
     } catch (error) {
       console.error(
@@ -1035,18 +948,6 @@ These are specific instructions from the user that should be followed throughout
     });
   }
 
-  private async _processQueuedStackedPR(
-    data: QueuedStackedPRAction["data"]
-  ): Promise<void> {
-    await this._createStackedTaskInternal({
-      parentTaskId: data.parentTaskId,
-      message: data.message,
-      model: data.model,
-      userId: data.userId,
-      newTaskId: data.newTaskId,
-    });
-  }
-
   async getAvailableModels(userApiKeys: ApiKeys): Promise<ModelType[]> {
     return await this.llmService.getAvailableModels(userApiKeys);
   }
@@ -1055,15 +956,11 @@ These are specific instructions from the user that should be followed throughout
     const action = this.queuedActions.get(taskId);
     if (!action) return null;
 
-    // Model is now required for both action types
-    const model =
-      action.type === "stacked-pr"
-        ? action.data.model
-        : action.data.context?.getMainModel();
+    const model = action.data.context?.getMainModel();
 
     if (!model) {
       console.warn(
-        `[CHAT] No model available for queued ${action.type} action in task ${taskId}`
+        `[CHAT] No model available for queued action in task ${taskId}`
       );
       return null;
     }
@@ -1199,262 +1096,6 @@ These are specific instructions from the user that should be followed throughout
         workspacePath,
         queue: false,
       });
-    }
-  }
-
-  /**
-   * Create a stacked PR (new task based on current task's shadow branch)
-   */
-  async createStackedPR({
-    parentTaskId,
-    message,
-    model,
-    userId,
-    queue,
-    socket,
-    newTaskId,
-  }: {
-    parentTaskId: string;
-    message: string;
-    model: ModelType;
-    userId: string;
-    queue: boolean;
-    socket: TypedSocket;
-    newTaskId?: string;
-  }): Promise<void> {
-    try {
-      // If there's an active stream and queue is true, queue the stacked PR
-      if (this.activeStreams.has(parentTaskId) && queue) {
-        this.queuedActions.set(parentTaskId, {
-          type: "stacked-pr",
-          data: {
-            message,
-            parentTaskId,
-            model,
-            userId,
-            socket,
-            newTaskId,
-          },
-        });
-        return;
-      }
-
-      // Create the stacked task immediately
-      await this._createStackedTaskInternal({
-        parentTaskId,
-        message,
-        model,
-        userId,
-        newTaskId,
-      });
-    } catch (error) {
-      console.error(`[CHAT] Error creating stacked PR:`, error);
-      socket.emit("message-error", {
-        error: "Failed to create stacked PR",
-      });
-    }
-  }
-
-  /**
-   * Internal method to create stacked task
-   */
-  private async _createStackedTaskInternal({
-    parentTaskId,
-    message,
-    model,
-    userId,
-    newTaskId,
-  }: {
-    parentTaskId: string;
-    message: string;
-    model: ModelType;
-    userId: string;
-    newTaskId?: string;
-  }): Promise<void> {
-    try {
-      // Get parent task details
-      const parentTask = await prisma.task.findUnique({
-        where: { id: parentTaskId },
-        select: {
-          repoFullName: true,
-          repoUrl: true,
-          shadowBranch: true,
-          userId: true,
-        },
-      });
-
-      if (!parentTask) {
-        throw new Error("Parent task not found");
-      }
-
-      if (parentTask.userId !== userId) {
-        throw new Error("Unauthorized to create stacked task");
-      }
-
-      const taskId = newTaskId || generateTaskId();
-
-      const parentContext =
-        await modelContextService.getContextForTask(parentTaskId);
-
-      // Create TaskModelContext for title generation
-      const context = await modelContextService.copyContext(
-        taskId,
-        parentContext!
-      );
-
-      // Generate title and branch for the new task
-      const { title, shadowBranch } = await generateTaskTitleAndBranch(
-        taskId,
-        message,
-        context
-      );
-
-      // Create the new stacked task
-      await prisma.task.create({
-        data: {
-          id: taskId,
-          title,
-          repoFullName: parentTask.repoFullName,
-          repoUrl: parentTask.repoUrl,
-          baseBranch: parentTask.shadowBranch, // Use parent's shadow branch as base
-          shadowBranch,
-          baseCommitSha: "pending",
-          status: "INITIALIZING",
-          user: {
-            connect: {
-              id: userId,
-            },
-          },
-          messages: {
-            create: {
-              content: message,
-              role: MessageRole.USER,
-              sequence: 1,
-              llmModel: model,
-            },
-          },
-        },
-      });
-
-      // Create a message in the parent task referencing the stacked task
-      const parentNextSequence = await this.getNextSequence(parentTaskId);
-      await prisma.chatMessage.create({
-        data: {
-          content: message,
-          role: MessageRole.USER,
-          llmModel: model,
-          taskId: parentTaskId,
-          stackedTaskId: taskId,
-          sequence: parentNextSequence,
-        },
-      });
-
-      // Trigger task initialization (similar to the backend initiate endpoint)
-      await this.initializeStackedTask(
-        taskId,
-        message,
-        model,
-        userId,
-        parentTaskId
-      );
-
-      // Emit event to frontend for optimistic message display with full context
-      emitToTask(parentTaskId, "queued-action-processing", {
-        taskId: parentTaskId,
-        type: "stacked-pr",
-        message,
-        model,
-        shadowBranch,
-        title,
-        newTaskId: taskId,
-      });
-    } catch (error) {
-      console.error(`[CHAT] Error in _createStackedTaskInternal:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Initialize a stacked task (similar to the backend initiate endpoint)
-   */
-  private async initializeStackedTask(
-    taskId: string,
-    message: string,
-    model: ModelType,
-    _userId: string,
-    parentTaskId: string
-  ): Promise<void> {
-    try {
-      const initializationEngine = new TaskInitializationEngine();
-
-      await updateTaskStatus(taskId, "RUNNING", "CHAT");
-
-      // Get parent's API keys from cached context
-      const parentContext =
-        await modelContextService.getContextForTask(parentTaskId);
-      if (!parentContext) {
-        throw new Error(`Parent task context not found for ${parentTaskId}`);
-      }
-
-      // Create new task context inheriting parent's API keys
-      const newTaskContext =
-        await modelContextService.createContextWithInheritedKeys(
-          taskId,
-          model,
-          parentContext.getApiKeys()
-        );
-
-      // Start task initialization in background (non-blocking)
-      // This will handle workspace setup, VM creation, etc.
-      initializationEngine
-        .initializeTask(taskId, undefined, _userId)
-        .catch((error: unknown) => {
-          console.error(
-            `[CHAT] Failed to initialize stacked task ${taskId}:`,
-            error
-          );
-        });
-
-      setTimeout(async () => {
-        try {
-          // Generate conversation summary from parent task
-          const chatSummarizationService = new ChatSummarizationService();
-          const conversationSummary =
-            await chatSummarizationService.summarizeParentChat(
-              parentTaskId,
-              newTaskContext
-            );
-
-          // Inject conversation summary as system message before user message
-          if (conversationSummary && conversationSummary.trim()) {
-            const contextMessage = `<parent_task_conversation_summary>${conversationSummary}</parent_task_conversation_summary>`;
-
-            const contextSequence = await this.getNextSequence(taskId);
-            await this.saveSystemMessage(
-              taskId,
-              contextMessage,
-              newTaskContext.getMainModel(),
-              contextSequence
-            );
-          }
-
-          await this.processUserMessage({
-            taskId,
-            userMessage: message,
-            context: newTaskContext,
-            workspacePath: undefined,
-            queue: false,
-            skipUserMessageSave: true, // Don't duplicate message - it's already in parent task
-          });
-        } catch (error) {
-          console.error(
-            `[CHAT] Failed to process first message for stacked task ${taskId}:`,
-            error
-          );
-        }
-      }, 1000);
-    } catch (error) {
-      console.error(`[CHAT] Error initializing stacked task ${taskId}:`, error);
     }
   }
 

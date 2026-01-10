@@ -35,7 +35,6 @@ function TaskPageContent() {
     isCompletionPending,
     sendMessage,
     stopStream,
-    createStackedPR,
   } = useTaskSocketContext();
 
   const handleSendMessage = useCallback(
@@ -56,15 +55,6 @@ function TaskPageContent() {
   const handleStopStream = useCallback(() => {
     stopStream();
   }, [stopStream]);
-
-  const handleCreateStackedPR = useCallback(
-    (message: string, model: ModelType, queue: boolean) => {
-      if (!taskId || !message.trim()) return;
-
-      createStackedPR(message, model, queue);
-    },
-    [taskId, createStackedPR]
-  );
 
   if (taskMessagesError) {
     return (
@@ -172,7 +162,6 @@ function TaskPageContent() {
 
           <PromptForm
             onSubmit={handleSendMessage}
-            onCreateStackedPR={handleCreateStackedPR}
             onStopStream={handleStopStream}
             isStreaming={isStreaming || sendMessageMutation.isPending}
             initialSelectedModel={task?.mainModel as ModelType | null}

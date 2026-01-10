@@ -11,7 +11,6 @@ import {
   CircleDashed,
   FileDiff,
   FolderGit2,
-  BookOpen,
   ListTodo,
   Square,
   SquareCheck,
@@ -22,14 +21,8 @@ import { statusColorsConfig } from "./status";
 import { FileExplorer } from "@/components/agent-environment/file-explorer";
 import { FileNode } from "@repo/types";
 import { useAgentEnvironment } from "@/components/agent-environment/agent-environment-context";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
-import { GithubLogo } from "../graphics/github/github-logo";
-import { useCreatePR } from "@/hooks/chat/use-create-pr";
-import { useTaskSocketContext } from "@/contexts/task-socket-context";
-import { Loader2 } from "lucide-react";
 
 const todoStatusConfig = {
   PENDING: { icon: Square, className: "text-muted-foreground" },
@@ -93,10 +86,7 @@ function createFileTree(filePaths: string[]): FileNode[] {
 
 export function SidebarAgentView({ taskId }: { taskId: string }) {
   const { task, todos, fileChanges, diffStats } = useTask(taskId);
-  const { updateSelectedFilePath, openAgentEnvironment, openShadowWiki } =
-    useAgentEnvironment();
-  const { isStreaming, autoPRStatus } = useTaskSocketContext();
-  const createPRMutation = useCreatePR();
+  const { updateSelectedFilePath, openAgentEnvironment } = useAgentEnvironment();
 
   const completedTodos = useMemo(
     () => todos.filter((todo) => todo.status === "COMPLETED").length,
@@ -125,97 +115,8 @@ export function SidebarAgentView({ taskId }: { taskId: string }) {
     [openAgentEnvironment, updateSelectedFilePath]
   );
 
-  const handleCreatePR = useCallback(async () => {
-    if (!task?.id) return;
-    try {
-      await createPRMutation.mutateAsync(task.id);
-    } catch (error) {
-      console.error("Failed to create PR:", error);
-    }
-  }, [task?.id, createPRMutation]);
-
-
-  // Determine if we should show create PR button
-  const showCreatePR = !task?.pullRequestNumber && fileChanges.length > 0;
-  const isAutoPRInProgress = autoPRStatus?.status === "in-progress";
-  const isCreatePRDisabled =
-    isStreaming || createPRMutation.isPending || isAutoPRInProgress;
-
-
   return (
     <>
-      {/* PR buttons - show create or view based on state (only if task has a repo) */}
-      {task.repoUrl &&
-        (task.pullRequestNumber || showCreatePR) &&
-        task.status !== "ARCHIVED" && (
-          <SidebarGroup>
-            <SidebarGroupContent className="flex flex-col gap-0.5">
-              <SidebarMenuItem>
-                {task.pullRequestNumber ? (
-                  // View PR button when PR exists
-                  <Button
-                    variant="secondary"
-                    className="bg-sidebar-accent hover:bg-sidebar-accent/80 border-sidebar-border px-2! w-full"
-                    asChild
-                  >
-                    <Link
-                      href={`${task.repoUrl}/pull/${task.pullRequestNumber}`}
-                      target="_blank"
-                    >
-                      <GithubLogo className="size-4 shrink-0" />
-                      <div className="flex gap-1 overflow-hidden">
-                        <span className="truncate">View Pull Request</span>
-                        <span className="text-muted-foreground">
-                          #{task.pullRequestNumber}
-                        </span>
-                      </div>
-                    </Link>
-                  </Button>
-                ) : (
-                  // Create PR button when file changes exist and no PR
-                  <Button
-                    variant="secondary"
-                    className="bg-sidebar-accent hover:bg-sidebar-accent/80 border-sidebar-border px-2! w-full"
-                    onClick={handleCreatePR}
-                    disabled={isCreatePRDisabled}
-                  >
-                    {createPRMutation.isPending || isAutoPRInProgress ? (
-                      <Loader2 className="size-4 shrink-0 animate-spin" />
-                    ) : (
-                      <GithubLogo className="size-4 shrink-0" />
-                    )}
-                    <span className="truncate">
-                      {createPRMutation.isPending
-                        ? "Creating..."
-                        : isAutoPRInProgress
-                          ? "Auto-Creating..."
-                          : "Create Pull Request"}
-                    </span>
-                  </Button>
-                )}
-              </SidebarMenuItem>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-      {/* Shadow Wiki - only show if codebase understanding exists */}
-      {task.codebaseUnderstandingId && (
-        <SidebarGroup>
-          <SidebarGroupContent className="flex flex-col gap-0.5">
-            <SidebarMenuItem>
-              <Button
-                variant="ghost"
-                className="hover:bg-sidebar-accent px-2! w-full justify-start font-normal"
-                onClick={() => openShadowWiki()}
-              >
-                <BookOpen className="size-4 shrink-0" />
-                <span className="truncate">Shadow Wiki</span>
-              </Button>
-            </SidebarMenuItem>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      )}
-
       <SidebarGroup>
         <SidebarGroupContent>
           <SidebarMenuItem>

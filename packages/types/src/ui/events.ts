@@ -1,11 +1,11 @@
-import { TaskStatus, InitStatus, PullRequestSnapshot } from "@repo/db";
+import { TaskStatus, InitStatus } from "@repo/db";
 import type { Message } from "../chat/messages";
 import type { StreamChunk } from "../chat/streaming-client";
 import type { ModelType } from "../llm/models";
 import type { SessionEntry } from "../claude-code/session";
 
 export type QueuedActionUI = {
-  type: "message" | "stacked-pr";
+  type: "message";
   message: string;
   model: ModelType;
 };
@@ -24,20 +24,6 @@ export interface TaskStatusUpdateEvent {
   initStatus?: InitStatus;
   timestamp: string;
   errorMessage?: string;
-}
-
-export interface AutoPRStatusEvent {
-  taskId: string;
-  messageId: string;
-  status: "in-progress" | "completed" | "failed";
-  
-  // Present when status === "completed"
-  snapshot?: Pick<PullRequestSnapshot, "title" | "description" | "filesChanged" | "linesAdded" | "linesRemoved" | "commitSha" | "status">;
-  prNumber?: number;
-  prUrl?: string;
-  
-  // Present when status === "failed"
-  error?: string;
 }
 
 export interface ServerToClientEvents {
@@ -81,15 +67,11 @@ export interface ServerToClientEvents {
   "terminal-error": (data: { error: string }) => void;
 
   "task-status-updated": (data: TaskStatusUpdateEvent) => void;
-  "auto-pr-status": (data: AutoPRStatusEvent) => void;
   "queued-action-processing": (data: {
     taskId: string;
-    type: "message" | "stacked-pr";
+    type: "message";
     message: string;
     model: ModelType;
-    shadowBranch?: string;
-    title?: string;
-    newTaskId?: string;
   }) => void;
 
   // Session events (Claude Code JSONL format)
@@ -117,13 +99,6 @@ export interface ClientToServerEvents {
   "stop-stream": (data: { taskId: string }) => void;
   "request-history": (data: { taskId: string; fromPosition?: number }) => void;
   "clear-queued-action": (data: { taskId: string }) => void;
-  "create-stacked-pr": (data: {
-    taskId: string;
-    message: string;
-    llmModel: ModelType;
-    queue?: boolean;
-    newTaskId?: string;
-  }) => void;
 
   "get-terminal-history": (data: { taskId: string }) => void;
   "clear-terminal": (data: { taskId: string }) => void;

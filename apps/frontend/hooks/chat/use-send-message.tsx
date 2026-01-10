@@ -46,7 +46,6 @@ export function useSendMessage() {
         llmModel: model,
         createdAt: new Date().toISOString(),
         metadata: { isStreaming: false },
-        pullRequestSnapshot: undefined,
       };
 
       queryClient.setQueryData<Message[]>(["task-messages", taskId], (old) => {

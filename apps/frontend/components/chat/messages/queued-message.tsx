@@ -1,4 +1,4 @@
-import { ListEnd, X, GitBranchPlus } from "lucide-react";
+import { ListEnd, X } from "lucide-react";
 import { Button } from "../../ui/button";
 import { useParams } from "next/navigation";
 import { useQueuedAction } from "@/hooks/chat/use-queued-action";
@@ -14,15 +14,11 @@ export function QueuedAction() {
 
   if (!queuedAction) return null;
 
-  const isStackedPR = queuedAction.type === "stacked-pr";
-  const IconComponent = isStackedPR ? GitBranchPlus : ListEnd;
-  const label = isStackedPR ? "Queued Branch" : "Queued Message";
-
   return (
     <div className="bg-card border-border animate-in fade-in absolute -top-12 left-0 flex w-full items-center justify-between gap-2 rounded-lg border py-1.5 pl-3 pr-1.5 text-sm duration-150">
       <div className="flex items-center gap-1.5 overflow-hidden">
-        <IconComponent className="size-4" />
-        <span className="select-none whitespace-nowrap">{label}</span>
+        <ListEnd className="size-4" />
+        <span className="select-none whitespace-nowrap">Queued Message</span>
         <span className="text-muted-foreground truncate">
           {queuedAction.message}
         </span>

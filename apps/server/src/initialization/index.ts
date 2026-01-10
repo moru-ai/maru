@@ -128,30 +128,11 @@ export class TaskInitializationEngine {
     userId: string
   ): Promise<void> {
     try {
-      // Get task info
-      const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        select: {
-          repoFullName: true,
-          repoUrl: true,
-          baseBranch: true,
-          shadowBranch: true,
-        },
-      });
-
-      if (!task) {
-        throw new Error(`Task not found: ${taskId}`);
-      }
-
       console.log(`[TASK_INIT] ${taskId}: Creating Moru sandbox...`);
 
       // Create sandbox via workspace manager
       const workspaceInfo = await moruWorkspaceManager.prepareWorkspace({
         id: taskId,
-        repoFullName: task.repoFullName,
-        repoUrl: task.repoUrl,
-        baseBranch: task.baseBranch || "main",
-        shadowBranch: task.shadowBranch || `shadow/task-${taskId}`,
         userId,
       });
 

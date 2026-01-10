@@ -224,8 +224,6 @@ Shadow provides a comprehensive set of tools for AI agents:
 
 ### Task Management
 - `todo_write` - Structured task management
-- `add_memory` - Repository-specific knowledge storage
-- `list_memories` - Retrieve stored knowledge
 
 ## Development Guidelines
 

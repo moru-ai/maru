@@ -43,11 +43,11 @@ export const sharedConfigSchema = z.object({
   // CORS configuration
   CORS_ORIGINS: z.string().optional(),
 
-  // Vector database (optional for all environments)
+  // Vector database (optional, currently unused)
   PINECONE_API_KEY: z.string().optional(),
   PINECONE_INDEX_NAME: z.string().default("shadow"),
   EMBEDDING_MODEL: z.string().default("llama-text-embed-v2"),
-  // ShadowWiki model and concurrency settings
+  // Model and concurrency settings
   CONCURRENCY: z.coerce.number().default(4),
   MODEL: z.string().default("gpt-4o"),
   MODEL_MINI: z.string().default("gpt-4o-mini"),
@@ -93,11 +93,11 @@ export const createSharedConfig = (
   // CORS
   corsOrigins: data.CORS_ORIGINS,
 
-  // Vector DB
+  // Vector DB (currently unused)
   pineconeApiKey: data.PINECONE_API_KEY,
   pineconeIndexName: data.PINECONE_INDEX_NAME,
   embeddingModel: data.EMBEDDING_MODEL,
-  // ShadowWiki settings
+  // Model settings
   concurrency: data.CONCURRENCY,
   model: data.MODEL,
   modelMini: data.MODEL_MINI,

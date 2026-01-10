@@ -65,7 +65,6 @@ export function useEditMessage() {
           ...old[messageIndex],
           content: newContent,
           llmModel: newModel,
-          pullRequestSnapshot: old[messageIndex]?.pullRequestSnapshot,
           metadata: {
             ...old[messageIndex]?.metadata,
           },

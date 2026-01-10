@@ -2,10 +2,8 @@
 
 import { createContext, useContext, ReactNode } from "react";
 import { useTaskSocket } from "@/hooks/socket/use-task-socket";
-import type { 
-  AssistantMessagePart, 
-  AutoPRStatusEvent 
-} from "@repo/types";
+import type { AssistantMessagePart } from "@repo/types";
+
 interface TaskSocketContextValue {
   isConnected: boolean;
   streamingPartsMap: Map<string, AssistantMessagePart>;
@@ -13,11 +11,9 @@ interface TaskSocketContextValue {
   isStreaming: boolean;
   setIsStreaming: (isStreaming: boolean) => void;
   isCompletionPending: boolean;
-  autoPRStatus: AutoPRStatusEvent | null;
   sendMessage: (message: string, model: string, queue?: boolean) => void;
   stopStream: () => void;
   clearQueuedAction: () => void;
-  createStackedPR: (message: string, model: string, queue?: boolean) => void;
 }
 
 const TaskSocketContext = createContext<TaskSocketContextValue | null>(null);

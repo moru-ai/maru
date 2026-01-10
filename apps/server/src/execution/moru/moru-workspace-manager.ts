@@ -34,17 +34,11 @@ export class MoruWorkspaceManager implements WorkspaceManager {
     try {
       console.log(`[MORU_WORKSPACE] Creating sandbox for task ${taskConfig.id}`);
 
-      // Build metadata - only include repo fields if they have values
+      // Build metadata
       const metadata: Record<string, string> = {
         taskId: taskConfig.id,
         userId: taskConfig.userId,
       };
-      if (taskConfig.repoUrl) {
-        metadata.repoUrl = taskConfig.repoUrl;
-      }
-      if (taskConfig.repoFullName) {
-        metadata.repoFullName = taskConfig.repoFullName;
-      }
 
       // Create new Moru sandbox
       const sandbox = await Sandbox.create(config.moruTemplateId || "shadow-agent", {

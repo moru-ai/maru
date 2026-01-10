@@ -1,1 +1,0 @@
-Retrieve previously stored memories for this repository to understand context, patterns, and important information from past sessions. Use at the start of tasks, when encountering unfamiliar patterns, or when needing historical context. memories are automatically injected into conversations, but this tool allows explicit retrieval when needed.

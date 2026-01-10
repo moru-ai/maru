@@ -14,10 +14,6 @@ export interface CommandResult extends BaseCommandResult {
 // Workspace management types
 export interface TaskConfig {
   id: string;
-  repoFullName?: string | null;
-  repoUrl?: string | null;
-  baseBranch?: string | null;
-  shadowBranch?: string | null;
   userId: string;
 }
 

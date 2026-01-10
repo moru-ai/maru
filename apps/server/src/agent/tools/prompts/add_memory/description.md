@@ -1,1 +1,0 @@
-Store important repository-specific information for future sessions. Use for architectural patterns, setup steps, configuration details, debugging approaches, performance insights, or any knowledge that should persist across sessions. Categorize memories (INFRA, SETUP, ARCHITECTURE, PATTERNS, BUGS, etc.) for better organization.

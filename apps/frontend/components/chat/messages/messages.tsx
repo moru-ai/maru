@@ -8,7 +8,6 @@ import { AssistantMessage } from "./assistant-message";
 import { UserMessage } from "./user-message";
 import InitializingAnimation from "../../task/initializing-animation";
 import { useMemo, memo, useRef } from "react";
-import { StackedPRCard } from "./stacked-pr-card";
 
 function groupMessages(messages: Message[]) {
   const messageGroups: Message[][] = [];
@@ -109,15 +108,6 @@ function MessagesComponent({
           <div className="flex flex-col gap-6" key={groupIndex}>
             {messageGroup.map((message) => {
               if (isUserMessage(message)) {
-                if (message.stackedTask) {
-                  return (
-                    <StackedPRCard
-                      key={message.id}
-                      stackedTask={message.stackedTask}
-                    />
-                  );
-                }
-
                 return (
                   <UserMessage
                     key={message.id}

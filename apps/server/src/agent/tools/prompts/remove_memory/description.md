@@ -1,1 +1,0 @@
-Remove outdated, incorrect, or no longer relevant memories from the repository memory store. Use when information has become obsolete due to code changes, contains errors, or is no longer applicable. Be cautious - memories contain valuable context from previous sessions.

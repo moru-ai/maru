@@ -38,9 +38,7 @@ export class ChatSummarizationService {
       const history = await this.chatService.getChatHistory(parentTaskId);
 
       const relevantMessages = history.filter(
-        (msg) =>
-          (msg.role === "user" || msg.role === "assistant") &&
-          !msg.stackedTaskId
+        (msg) => msg.role === "user" || msg.role === "assistant"
       );
 
       if (relevantMessages.length === 0) {

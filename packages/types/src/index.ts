@@ -34,11 +34,6 @@ export * from "./utils/title-generation";
 // === Task Status Types ===
 export * from "./tasks";
 
-// === Codebase Understanding Types ===
-export * from "./codebase-understanding/summaries";
-
-// === GitHub Types ===
-export * from "./github";
 
 // === API Keys Types ===
 export * from "./api-keys";

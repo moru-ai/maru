@@ -11,7 +11,6 @@ import { type ModelType } from "@repo/types";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUp,
-  GitBranchPlus,
   ListEnd,
   Loader2,
   MessageCircle,
@@ -36,7 +35,6 @@ import { useSelectedModel } from "@/hooks/chat/use-selected-model";
 
 export function PromptForm({
   onSubmit,
-  onCreateStackedPR,
   onStopStream,
   isStreaming = false,
   isHome = false,
@@ -47,11 +45,6 @@ export function PromptForm({
   transition,
 }: {
   onSubmit?: (message: string, model: ModelType, queue: boolean) => void;
-  onCreateStackedPR?: (
-    message: string,
-    model: ModelType,
-    queue: boolean
-  ) => void;
   onStopStream?: () => void;
   isStreaming?: boolean;
   isHome?: boolean;
@@ -123,22 +116,6 @@ export function PromptForm({
       setMessage("");
     };
 
-    const stackPRAction = (queue: boolean) => () => {
-      if (!selectedModel) {
-        toast.error("Please select a model first");
-        return;
-      }
-      onCreateStackedPR?.(message, selectedModel, queue);
-      if (queue) {
-        queryClient.setQueryData(["queued-action", taskId], {
-          type: "stacked-pr",
-          message,
-          model: selectedModel,
-        });
-      }
-      setMessage("");
-    };
-
     return isStreaming
       ? [
           {
@@ -167,19 +144,6 @@ export function PromptForm({
               shift: false,
             },
           },
-          {
-            id: "stack-pr",
-            icon: GitBranchPlus,
-            label: "Queue Stacked Branch",
-            action: stackPRAction(true),
-            shortcut: {
-              key: "Enter",
-              meta: false,
-              ctrl: false,
-              alt: true,
-              shift: false,
-            },
-          },
         ]
       : [
           {
@@ -192,19 +156,6 @@ export function PromptForm({
               meta: false,
               ctrl: false,
               alt: false,
-              shift: false,
-            },
-          },
-          {
-            id: "stack-pr",
-            icon: GitBranchPlus,
-            label: "Create Stacked Branch",
-            action: stackPRAction(false),
-            shortcut: {
-              key: "Enter",
-              meta: false,
-              ctrl: false,
-              alt: true,
               shift: false,
             },
           },

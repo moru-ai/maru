@@ -1,14 +1,11 @@
 "use client";
 
 import { patchMonacoWithShiki } from "@/lib/editor/highlighter";
-import { AlertTriangle, ChevronRight, Info } from "lucide-react";
+import { AlertTriangle, ChevronRight } from "lucide-react";
 import dynamic from "next/dynamic";
 import { Fragment, useEffect, useState, memo, useMemo } from "react";
 import { getLanguageFromPath } from "@repo/types";
 import { LogoHover } from "../graphics/logo/logo-hover";
-import { SHADOW_WIKI_PATH } from "@/lib/constants";
-import { ShadowWikiContent } from "../shadow-wiki/shadow-wiki";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { MemoizedMarkdown } from "../chat/markdown/memoized-markdown";
 
 // Dynamic import Monaco Editor to avoid SSR issues
@@ -32,8 +29,6 @@ function EditorComponent({
   isLoadingContent?: boolean;
   contentError?: string;
 }) {
-  const isShadowWiki = selectedFilePath === SHADOW_WIKI_PATH;
-
   const [isShikiReady, setIsShikiReady] = useState(false);
 
   // Extract content string or object
@@ -53,20 +48,7 @@ function EditorComponent({
   const filePathHeader = useMemo(
     () => (
       <div className="text-muted-foreground flex items-center gap-0.5 px-5 pb-1 pt-2 text-[13px]">
-        {selectedFilePath === SHADOW_WIKI_PATH ? (
-          <div className="text-muted-foreground flex items-center gap-2">
-            Shadow Wiki{" "}
-            <Tooltip>
-              <TooltipTrigger>
-                <Info className="size-3.5" />
-              </TooltipTrigger>
-              <TooltipContent className="h-auto max-w-44" side="bottom">
-                LLM-generated codebase understanding notes
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        ) : (
-          selectedFilePath &&
+        {selectedFilePath &&
           selectedFilePath.split("/").map((part, index) => (
             <Fragment key={index}>
               {index > 1 && (
@@ -78,8 +60,7 @@ function EditorComponent({
                 {part}
               </span>
             </Fragment>
-          ))
-        )}
+          ))}
       </div>
     ),
     [selectedFilePath]
@@ -106,9 +87,7 @@ function EditorComponent({
             )}
           </div>
         )}
-        {isShadowWiki ? (
-          <ShadowWikiContent />
-        ) : isMarkdownFile && fileContentString ? (
+        {isMarkdownFile && fileContentString ? (
           <div className="h-full overflow-auto p-4">
             <MemoizedMarkdown
               content={fileContentString}

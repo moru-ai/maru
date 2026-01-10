@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  BookOpen,
   ChevronDown,
   ChevronRight,
   Folder,
@@ -12,7 +11,6 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { FileNode } from "@repo/types";
 import { FileIcon } from "@/components/ui/file-icon";
-import { SHADOW_WIKI_PATH } from "@/lib/constants";
 
 interface FileChangeOperation {
   filePath: string;
@@ -211,33 +209,9 @@ export function FileExplorer(props: AgentEnvironmentProps | OtherViewProps) {
       return (
         <div className="bg-sidebar border-border @max-[500px]/agent-environment:w-36 flex w-48 shrink-0 select-none flex-col overflow-hidden border-r">
           {files.length > 0 ? (
-            <>
-              <div className="group/files flex w-full grow flex-col gap-0.5 overflow-y-auto p-1">
-                {files.map((file) => renderNode(file))}
-              </div>
-              <div className="relative z-0">
-                <div className="bg-vesper-orange/15 absolute -top-4 left-3 -z-10 h-8 w-1/3 animate-pulse blur-lg delay-500 duration-1000"></div>
-                <div className="bg-vesper-teal/15 absolute -top-1 left-1/3 -z-10 h-6 w-2/3 animate-pulse blur-lg delay-0 duration-1000"></div>
-                <div className="border-sidebar-border bg-sidebar/50 border-t p-1 backdrop-blur-lg">
-                  <button
-                    className={cn(
-                      "group/item text-foreground/80 hover:text-foreground flex w-full cursor-pointer items-center gap-1.5 overflow-hidden rounded-md px-2 py-1 hover:bg-white/10",
-                      selectedFilePath === SHADOW_WIKI_PATH ? "bg-white/5" : ""
-                    )}
-                    onClick={() => {
-                      props.onFileSelect({
-                        path: SHADOW_WIKI_PATH,
-                        type: "file",
-                        name: "Shadow Wiki",
-                      });
-                    }}
-                  >
-                    <BookOpen className="size-4" />
-                    <span className="text-sm">Shadow Wiki</span>
-                  </button>
-                </div>
-              </div>
-            </>
+            <div className="group/files flex w-full grow flex-col gap-0.5 overflow-y-auto p-1">
+              {files.map((file) => renderNode(file))}
+            </div>
           ) : (
             <div className="flex w-full justify-center p-4">
               <Loader2 className="text-muted-foreground size-3.5 animate-spin" />

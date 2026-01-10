@@ -19,12 +19,9 @@ import {
   hasUsefulPartialArgs,
   STREAMING_ENABLED_TOOLS,
 } from "@/lib/streaming-args";
-import { PRCard } from "./pr-card";
-import { LoadingPRCard } from "./loading-pr-card";
 import { Button } from "../../ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../../ui/tooltip";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import { useTaskSocketContext } from "@/contexts/task-socket-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -79,7 +76,6 @@ export function AssistantMessage({
     isCopied: isMessageContentCopied,
   } = useCopyToClipboard();
   const { copyToClipboard: copyMessageId } = useCopyToClipboard();
-  const { autoPRStatus } = useTaskSocketContext();
 
   const toolResultsMap = useMemo(() => {
     const map = new Map<string, { result: unknown; toolName: string }>();
@@ -332,41 +328,6 @@ export function AssistantMessage({
           </div>
         </div>
       )}
-
-      {/* Show PR card if this assistant message has a PR snapshot */}
-      {message.pullRequestSnapshot && (
-        <PRCard
-          taskId={taskId}
-          snapshot={message.pullRequestSnapshot}
-          messageId={message.id}
-        />
-      )}
-
-      {/* Show loading PR card during auto-PR creation */}
-      {!message.pullRequestSnapshot &&
-        autoPRStatus?.messageId === message.id &&
-        (autoPRStatus.status === "in-progress" ||
-          (autoPRStatus.status === "completed" && autoPRStatus.snapshot)) &&
-        (autoPRStatus.status === "in-progress" ? (
-          <LoadingPRCard />
-        ) : autoPRStatus.status === "completed" && autoPRStatus.snapshot ? (
-          <PRCard
-            taskId={taskId}
-            snapshot={{
-              id: "temp-snapshot",
-              messageId: message.id,
-              status: autoPRStatus.snapshot.status,
-              title: autoPRStatus.snapshot.title,
-              description: autoPRStatus.snapshot.description,
-              filesChanged: autoPRStatus.snapshot.filesChanged,
-              linesAdded: autoPRStatus.snapshot.linesAdded,
-              linesRemoved: autoPRStatus.snapshot.linesRemoved,
-              commitSha: autoPRStatus.snapshot.commitSha,
-              createdAt: new Date(),
-            }}
-            messageId={message.id}
-          />
-        ) : null)}
 
       <div
         className={cn(

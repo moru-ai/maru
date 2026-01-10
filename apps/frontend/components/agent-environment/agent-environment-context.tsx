@@ -1,7 +1,6 @@
 "use client";
 
 import { useFileContent } from "@/hooks/agent-environment/use-file-content";
-import { SHADOW_WIKI_PATH } from "@/lib/constants";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   createContext,
@@ -33,7 +32,6 @@ type AgentEnvironmentContextType = {
   openAgentEnvironment: () => void;
   triggerTerminalResize: () => void;
   terminalResizeTrigger: number;
-  openShadowWiki: () => void;
   // Sheet management - exposed for page components
   isSheetOpen: boolean;
   setIsSheetOpen: (open: boolean) => void;
@@ -62,7 +60,7 @@ export function AgentEnvironmentProvider({
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   function updateSelectedFilePath(path: string | null) {
-    if (path && !path.startsWith("/") && path !== SHADOW_WIKI_PATH) {
+    if (path && !path.startsWith("/")) {
       setSelectedFilePath("/" + path);
     } else {
       setSelectedFilePath(path);
@@ -116,11 +114,6 @@ export function AgentEnvironmentProvider({
     expandRightPanel();
   }, [shouldUseSheet, expandRightPanel]);
 
-  const openShadowWiki = useCallback(() => {
-    openAgentEnvironment();
-    setSelectedFilePath(SHADOW_WIKI_PATH);
-  }, [openAgentEnvironment]);
-
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const triggerTerminalResize = useCallback(() => {
     if (debounceTimeoutRef.current) {
@@ -144,7 +137,6 @@ export function AgentEnvironmentProvider({
       openAgentEnvironment,
       triggerTerminalResize,
       terminalResizeTrigger,
-      openShadowWiki,
       isSheetOpen,
       setIsSheetOpen,
       shouldUseSheet,
@@ -161,7 +153,6 @@ export function AgentEnvironmentProvider({
       openAgentEnvironment,
       triggerTerminalResize,
       terminalResizeTrigger,
-      openShadowWiki,
       isSheetOpen,
       shouldUseSheet,
     ]

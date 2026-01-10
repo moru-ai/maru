@@ -5,9 +5,24 @@ import { MessageRole, prisma, Task } from "@repo/db";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { z, ZodIssue } from "zod";
-import { generateTaskTitleAndBranch } from "./generate-title-branch";
 import { generateTaskId, MAX_TASKS_PER_USER_PRODUCTION } from "@repo/types";
 import { makeBackendRequest } from "../make-backend-request";
+
+/**
+ * Generate a simple title from the message content
+ */
+function generateSimpleTitle(message: string): string {
+  // Clean and truncate the message for a title
+  const cleaned = message.trim().replace(/\s+/g, " ");
+  const maxLength = 80;
+  if (cleaned.length <= maxLength) {
+    return cleaned;
+  }
+  // Truncate at word boundary
+  const truncated = cleaned.slice(0, maxLength);
+  const lastSpace = truncated.lastIndexOf(" ");
+  return (lastSpace > 40 ? truncated.slice(0, lastSpace) : truncated) + "...";
+}
 
 const createTaskSchema = z.object({
   message: z
@@ -59,8 +74,8 @@ export async function createTask(formData: FormData) {
   let task: Task;
 
   try {
-    // Generate a title for the task
-    const { title } = await generateTaskTitleAndBranch(taskId, message);
+    // Generate a simple title for the task
+    const title = generateSimpleTitle(message);
 
     // Create the task
     task = await prisma.task.create({

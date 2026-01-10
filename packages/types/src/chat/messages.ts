@@ -7,7 +7,7 @@ import type {
 } from "ai";
 import { ToolExecutionStatusType } from "../tools/execution";
 import { ToolResultTypes } from "../tools/tool-schemas";
-import type { PullRequestSnapshot, TaskStatus, Todo } from "@repo/db";
+import type { Todo } from "@repo/db";
 
 // Error part type for AI SDK error chunks
 export interface ErrorPart {
@@ -70,14 +70,6 @@ export type Message = {
   llmModel: string;
   createdAt: string;
   metadata?: MessageMetadata;
-  pullRequestSnapshot?: PullRequestSnapshot;
-  stackedTaskId?: string;
-  stackedTask?: {
-    id: string;
-    title: string;
-    shadowBranch?: string;
-    status?: TaskStatus;
-  };
 };
 
 export interface MessageMetadata {
