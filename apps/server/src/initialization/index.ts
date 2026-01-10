@@ -2,6 +2,7 @@ import { InitStatus, prisma } from "@repo/db";
 import { MORU_INIT_STEPS, InitializationProgress } from "@repo/types";
 import { emitStreamChunk } from "../socket";
 import { moruWorkspaceManager } from "../execution/moru/moru-workspace-manager";
+import { agentProcessManager } from "../services/agent-process-manager";
 import {
   setInitStatus,
   setTaskFailed,
@@ -14,14 +15,21 @@ export class TaskInitializationEngine {
     // Workspace manager is accessed directly via moruWorkspaceManager singleton
   }
 
+  // Store API key for use during initialization steps
+  private anthropicApiKey: string | undefined;
+
   /**
    * Initialize a task with the specified steps
    */
   async initializeTask(
     taskId: string,
     steps: InitStatus[] = ["CREATE_SANDBOX"],
-    userId: string
+    userId: string,
+    anthropicApiKey?: string
   ): Promise<void> {
+    // Store API key for use in executeStep
+    this.anthropicApiKey = anthropicApiKey;
+
     try {
       // Clear any previous progress and start fresh
       await clearTaskProgress(taskId);
@@ -121,7 +129,7 @@ export class TaskInitializationEngine {
 
   /**
    * Create Moru Sandbox step
-   * Creates a new Moru sandbox VM for the task
+   * Creates a new Moru sandbox VM for the task and starts the agent process
    */
   private async executeCreateSandbox(
     taskId: string,
@@ -149,6 +157,22 @@ export class TaskInitializationEngine {
       });
 
       console.log(`[TASK_INIT] ${taskId}: Moru sandbox created successfully`);
+
+      // Start the agent process if we have an API key
+      if (this.anthropicApiKey) {
+        console.log(`[TASK_INIT] ${taskId}: Starting agent process...`);
+
+        const sandbox = moruWorkspaceManager.getSandboxFromCache(taskId);
+        if (!sandbox) {
+          throw new Error("Sandbox not found in cache after creation");
+        }
+
+        await agentProcessManager.startAgent(taskId, sandbox, this.anthropicApiKey);
+
+        console.log(`[TASK_INIT] ${taskId}: Agent process started successfully`);
+      } else {
+        console.warn(`[TASK_INIT] ${taskId}: No API key provided, skipping agent start`);
+      }
     } catch (error) {
       console.error(`[TASK_INIT] ${taskId}: Failed to create sandbox:`, error);
       throw error;

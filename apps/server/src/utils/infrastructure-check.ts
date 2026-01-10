@@ -9,7 +9,8 @@ import { MORU_INIT_STEPS } from "@repo/types";
  */
 export async function ensureTaskInfrastructureExists(
   taskId: string,
-  userId: string
+  userId: string,
+  anthropicApiKey?: string
 ): Promise<void> {
   console.log(`[INFRA_CHECK] Checking infrastructure for task ${taskId}`);
 
@@ -32,7 +33,7 @@ export async function ensureTaskInfrastructureExists(
       console.log(
         `[INFRA_CHECK] ${taskId}: No active session found, re-initialization required`
       );
-      await triggerReinitialization(taskId, userId);
+      await triggerReinitialization(taskId, userId, anthropicApiKey);
       return;
     }
 
@@ -46,7 +47,7 @@ export async function ensureTaskInfrastructureExists(
         console.log(
           `[INFRA_CHECK] ${taskId}: Sandbox unhealthy (health check failed), re-initialization required`
         );
-        await triggerReinitialization(taskId, userId);
+        await triggerReinitialization(taskId, userId, anthropicApiKey);
         return;
       }
 
@@ -57,7 +58,7 @@ export async function ensureTaskInfrastructureExists(
       console.log(
         `[INFRA_CHECK] ${taskId}: Sandbox inaccessible (${error instanceof Error ? error.message : "Unknown error"}), re-initialization required`
       );
-      await triggerReinitialization(taskId, userId);
+      await triggerReinitialization(taskId, userId, anthropicApiKey);
       return;
     }
   } catch (error) {
@@ -77,7 +78,8 @@ export async function ensureTaskInfrastructureExists(
  */
 async function triggerReinitialization(
   taskId: string,
-  userId: string
+  userId: string,
+  anthropicApiKey?: string
 ): Promise<void> {
   console.log(`[INFRA_CHECK] ${taskId}: Starting re-initialization`);
 
@@ -95,7 +97,7 @@ async function triggerReinitialization(
   // Use TaskInitializationEngine for re-initialization
   const initEngine = new TaskInitializationEngine();
 
-  await initEngine.initializeTask(taskId, MORU_INIT_STEPS, userId);
+  await initEngine.initializeTask(taskId, MORU_INIT_STEPS, userId, anthropicApiKey);
 
   console.log(
     `[INFRA_CHECK] ${taskId}: Re-initialization completed successfully`

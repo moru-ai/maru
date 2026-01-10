@@ -77,6 +77,45 @@ export interface ServerToClientEvents {
   // Session events (Claude Code JSONL format)
   "session-entry": (data: { taskId: string; entry: SessionEntry }) => void;
   "session-entries": (data: { taskId: string; entries: SessionEntry[] }) => void;
+
+  // Agent process events (Claude Agent SDK protocol)
+  "agent-ready": (data: {
+    taskId: string;
+    sessionId: string;
+    workspace: string;
+  }) => void;
+  "agent-error": (data: {
+    taskId: string;
+    error: string;
+    code?: string;
+  }) => void;
+  "agent-stopped": (data: {
+    taskId: string;
+    reason: "stop" | "error" | "eof";
+  }) => void;
+  "session-started": (data: {
+    taskId: string;
+    sessionId: string;
+  }) => void;
+  "session-complete": (data: {
+    taskId: string;
+    sessionId: string;
+    result?: {
+      duration_ms?: number;
+      duration_api_ms?: number;
+      total_cost_usd?: number | null;
+      num_turns?: number;
+    };
+  }) => void;
+  "session-interrupted": (data: {
+    taskId: string;
+    sessionId: string;
+  }) => void;
+  "session-error": (data: {
+    taskId: string;
+    error: string;
+    code?: string;
+  }) => void;
 }
 
 export interface ClientToServerEvents {
