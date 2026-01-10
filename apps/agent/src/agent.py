@@ -154,6 +154,7 @@ class Agent:
             cwd=self.workspace,
             resume=resume_session_id,
             fork_session=fork,
+            setting_sources=["user"],
         )
 
         try:
