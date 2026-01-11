@@ -20,32 +20,20 @@ With this example, developers can build apps that:
 ### 🤖 Multi-Agent Sessions
 Run multiple Claude Agent SDK instances in parallel. Each agent gets its own dedicated Linux computer with a filesystem.
 
-→ See [`apps/server/src/services/agent-session.ts`](apps/server/src/services/agent-session.ts)
-
 ### 🔄 Session Resume
 Agents maintain session history. Resume interrupted sessions seamlessly - the agent picks up exactly where it left off.
-
-→ See [`apps/server/src/services/agent-session.ts`](apps/server/src/services/agent-session.ts) (`restoreSession`)
 
 ### ⚡ Real-time Streaming
 Stream agent messages as they happen. See tool executions, thinking, and results in real-time through WebSocket connections.
 
-→ See [`apps/server/src/socket.ts`](apps/server/src/socket.ts)
-
 ### 💬 Native Message Format
 Renders Claude Code's native message format using schemas from [moru-ai/agent-schemas](https://github.com/moru-ai/agent-schemas). Displays assistant messages, tool uses, thinking blocks, and system messages.
-
-→ See [`apps/frontend/components/claude-code/`](apps/frontend/components/claude-code/)
 
 ### 💾 Workspace Persistence
 Workspaces are saved to cloud storage (GCS) and restored on session resume. Files, git history, and Claude session data persist across sessions.
 
-→ See [`apps/server/src/services/storage/`](apps/server/src/services/storage/)
-
 ### 📁 File Explorer & Editor
-Browse and view files in the agent's workspace. Download files directly from the sandbox.
-
-→ See [`apps/frontend/components/agent-environment/`](apps/frontend/components/agent-environment/)
+Browse and view files in the agent's workspace. Download files that the agent writes or edits.
 
 ## Upcoming
 
