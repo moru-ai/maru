@@ -43,7 +43,7 @@ Browse and view files in the agent's workspace. Download files that the agent wr
 
 ## Try It
 
-**Cloud**: [maru.moru.io](https://maru.moru.io)
+**Cloud**: [maru.moru.io](https://maru.moru.io) - Maru is BYOK (Bring Your Own Key). Please use your own `ANTHROPIC_API_KEY`. Your API key is not saved on our server.
 
 **Self-hosted**: Follow the setup instructions below.
 
