@@ -118,6 +118,27 @@ export function AgentEnvironmentProvider({
   const hasAutoOpenedRef = useRef(false);
   const prevTreeLengthRef = useRef<number>(0);
 
+  // Helper to find the first file in a tree structure
+  const findFirstFile = useCallback(
+    (
+      nodes: Array<{ name: string; type: "file" | "folder"; path: string; children?: Array<unknown> }>
+    ): string | null => {
+      for (const node of nodes) {
+        if (node.type === "file") {
+          return node.path;
+        }
+        if (node.type === "folder" && node.children && node.children.length > 0) {
+          const found = findFirstFile(
+            node.children as Array<{ name: string; type: "file" | "folder"; path: string; children?: Array<unknown> }>
+          );
+          if (found) return found;
+        }
+      }
+      return null;
+    },
+    []
+  );
+
   useEffect(() => {
     const currentLength = treeData?.tree?.length ?? 0;
     const prevLength = prevTreeLengthRef.current;
@@ -126,10 +147,18 @@ export function AgentEnvironmentProvider({
     if (prevLength === 0 && currentLength > 0 && !hasAutoOpenedRef.current) {
       hasAutoOpenedRef.current = true;
       openAgentEnvironment();
+
+      // Auto-select the first file
+      if (treeData?.tree) {
+        const firstFilePath = findFirstFile(treeData.tree);
+        if (firstFilePath) {
+          updateSelectedFilePath(firstFilePath);
+        }
+      }
     }
 
     prevTreeLengthRef.current = currentLength;
-  }, [treeData?.tree?.length, openAgentEnvironment]);
+  }, [treeData?.tree, openAgentEnvironment, findFirstFile]);
 
   const value: AgentEnvironmentContextType = useMemo(
     () => ({
