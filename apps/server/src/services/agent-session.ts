@@ -68,6 +68,10 @@ export async function sendMessage(
   let buffer = "";
   let pollTimer: NodeJS.Timeout | null = null;
   let stopped = false;
+  let hasApiError = false;
+  let apiErrorMessage: string | null = null;
+  const sessionStartTime = Date.now();
+  const MAX_SESSION_TIMEOUT_MS = 1800000;  // 30 minutes absolute max (safety net)
   let done: () => void;
   const complete = new Promise<void>(r => (done = r));
 
@@ -75,7 +79,10 @@ export async function sendMessage(
   const handle = await sandbox.commands.run("cd /app/src && python3 agent.py", {
     background: true,
     stdin: true,
-    envs: { ANTHROPIC_API_KEY: apiKey, WORKSPACE_DIR: "/workspace" },
+    envs: { WORKSPACE_DIR: "/workspace" },
+    // Agent sessions can run for extended periods (web searches, complex tasks).
+    // Default SDK timeout is 60 seconds which causes silent failures on longer tasks.
+    timeoutMs: MAX_SESSION_TIMEOUT_MS,
     onStdout: (data: string) => {
       buffer += data;
       const lines = buffer.split("\n");
@@ -95,14 +102,28 @@ export async function sendMessage(
   function handleMessage(msg: Record<string, unknown>) {
     if (msg.type === "session_started") {
       sessionId = msg.session_id as string;
-      // Save sessionId to database - must handle promise to avoid silent failures
       prisma.task.update({ where: { id: taskId }, data: { sessionId } })
         .catch((err) => console.error(`[AGENT_SESSION] Failed to save sessionId:`, err));
       emitToTask(taskId, "session-started", { taskId, sessionId });
 
-      // Start polling with setTimeout (sequential, no race)
+      // Start polling for session entries
       async function doPoll() {
-        linesRead = await pollFile(taskId, userId, sessionId!, sandbox, linesRead);
+        const result = await pollFile(taskId, userId, sessionId!, sandbox, linesRead);
+        linesRead = result.linesRead;
+
+        if (result.apiError) {
+          hasApiError = true;
+          apiErrorMessage = result.apiError.message;
+        }
+
+        // Safety net: absolute session timeout (30 min)
+        const sessionRunningMs = Date.now() - sessionStartTime;
+        if (sessionRunningMs > MAX_SESSION_TIMEOUT_MS && !stopped) {
+          console.log(`[AGENT_SESSION] Task ${taskId} hit absolute session timeout (${sessionRunningMs}ms)`);
+          handleMessage({ type: "session_complete", result: { timed_out: true, reason: "session_timeout" } });
+          return;
+        }
+
         if (!stopped) {
           pollTimer = setTimeout(doPoll, 300);
         }
@@ -111,19 +132,26 @@ export async function sendMessage(
     }
 
     if (msg.type === "session_complete") {
-      // Stop polling
       stopped = true;
       if (pollTimer) clearTimeout(pollTimer);
 
-      // Final read, emit completion, save workspace, kill sandbox
       (async () => {
-        // Read final entries before emitting completion
-        linesRead = await pollFile(taskId, userId, sessionId!, sandbox, linesRead);
+        // Read final entries
+        const result = await pollFile(taskId, userId, sessionId!, sandbox, linesRead);
+        linesRead = result.linesRead;
+        if (result.apiError) {
+          hasApiError = true;
+          apiErrorMessage = result.apiError.message;
+        }
 
-        // Emit after pollFile so client has all entries
-        emitToTask(taskId, "session-complete", { taskId, sessionId, result: msg.result });
+        // Emit completion
+        if (hasApiError) {
+          emitToTask(taskId, "session-error", { taskId, sessionId, error: apiErrorMessage });
+        } else {
+          emitToTask(taskId, "session-complete", { taskId, sessionId, result: msg.result });
+        }
 
-        // Save workspace to storage before killing sandbox
+        // Save workspace
         if (isSandboxStorageConfigured()) {
           try {
             const storage = createSandboxStorage();
@@ -153,9 +181,62 @@ export async function sendMessage(
           console.warn(`[AGENT_SESSION] Failed to kill sandbox:`, error);
         }
 
-        // Update task status to COMPLETED
-        await updateTaskStatus(taskId, "COMPLETED", "AGENT_SESSION");
+        // Update task status
+        if (hasApiError) {
+          console.log(`[AGENT_SESSION] Task ${taskId} failed due to API error: ${apiErrorMessage}`);
+          await updateTaskStatus(taskId, "FAILED", "AGENT_SESSION");
+        } else {
+          await updateTaskStatus(taskId, "COMPLETED", "AGENT_SESSION");
+        }
 
+        done();
+      })();
+    }
+
+    if (msg.type === "session_error") {
+      stopped = true;
+      if (pollTimer) clearTimeout(pollTimer);
+
+      const errorMessage = msg.message as string;
+      console.error(`[AGENT_SESSION] Session error for task ${taskId}: ${errorMessage}`);
+
+      (async () => {
+        // Read final entries
+        if (sessionId) {
+          await pollFile(taskId, userId, sessionId, sandbox, linesRead);
+        }
+
+        emitToTask(taskId, "session-error", { taskId, sessionId, error: errorMessage });
+
+        // Save workspace (partial work)
+        if (isSandboxStorageConfigured()) {
+          try {
+            const storage = createSandboxStorage();
+            const saveResult = await storage.save(taskId, userId, sandbox, {
+              paths: ["/workspace", "/home/user/.claude"]
+            });
+
+            if (saveResult.success) {
+              await prisma.task.update({
+                where: { id: taskId },
+                data: { workspaceArchiveId: saveResult.archiveId }
+              });
+              console.log(`[AGENT_SESSION] Saved workspace on error: ${saveResult.archiveId}`);
+            }
+          } catch (error) {
+            console.warn(`[AGENT_SESSION] Workspace save error:`, error);
+          }
+        }
+
+        // Kill sandbox
+        try {
+          await sandbox.kill();
+          console.log(`[AGENT_SESSION] Killed sandbox for task ${taskId} (error)`);
+        } catch (error) {
+          console.warn(`[AGENT_SESSION] Failed to kill sandbox:`, error);
+        }
+
+        await updateTaskStatus(taskId, "FAILED", "AGENT_SESSION");
         done();
       })();
     }
@@ -182,13 +263,20 @@ export async function sendMessage(
 
 // --- Helpers ---
 
+interface PollResult {
+  linesRead: number;
+  apiError?: { message: string };
+}
+
 async function pollFile(
   taskId: string,
   userId: string,
   sessionId: string,
   sandbox: Sandbox,
   fromLine: number
-): Promise<number> {
+): Promise<PollResult> {
+  let apiError: { message: string } | undefined;
+
   try {
     const path = `/home/user/.claude/projects/-workspace/${sessionId}.jsonl`;
     const content = await sandbox.files.read(path);
@@ -199,6 +287,12 @@ async function pollFile(
       if (!line?.trim()) continue;
       const entry = JSON.parse(line);
 
+      // Detect API error entries
+      if (entry.isApiErrorMessage === true && entry.message?.content?.[0]?.text) {
+        apiError = { message: entry.message.content[0].text };
+        console.log(`[AGENT_SESSION] Detected API error in session: ${apiError.message}`);
+      }
+
       await prisma.sessionEvent.create({
         data: { taskId, userId, sessionId, timestamp: new Date(), data: entry }
       });
@@ -206,7 +300,8 @@ async function pollFile(
       fromLine++;
     }
   } catch {}
-  return fromLine;
+
+  return { linesRead: fromLine, apiError };
 }
 
 async function restoreSession(

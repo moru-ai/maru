@@ -2,36 +2,32 @@
 """
 Maru Agent - Claude Agent SDK integration for moru sandbox.
 
-Streaming pattern:
-1. Read stdin, yield messages to client.query()
-2. Process responses from client.receive_response() concurrently
-3. Emit session_started when we get init message with session_id
+Simplified single-turn pattern using query() function:
+1. Read process_start from stdin
+2. Read session_message from stdin
+3. Call query() with prompt and options
+4. Iterate messages until ResultMessage
+5. Done
 """
 
 import asyncio
 import json
 import os
 import sys
-from collections.abc import AsyncGenerator
 
-from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, ResultMessage, SystemMessage
+from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage, SystemMessage, ProcessError
 
 from protocol import (
-    ServerToAgentMessage,
-    SessionMessageCommand,
-    ContentBlock,
     AgentToServerMessage,
     ProcessReadyEvent,
     ProcessErrorEvent,
     ProcessStoppedEvent,
     SessionStartedEvent,
     SessionCompleteEvent,
-    SessionInterruptedEvent,
+    SessionErrorEvent,
     ResultData,
     is_process_start,
     is_session_message,
-    is_session_interrupt,
-    is_process_stop,
 )
 
 
@@ -43,10 +39,7 @@ def emit(msg: AgentToServerMessage) -> None:
 class Agent:
     def __init__(self, workspace: str):
         self.workspace = workspace
-        self.client: ClaudeSDKClient | None = None
-        self.current_session_id: str | None = None
         self.reader: asyncio.StreamReader | None = None
-        self.should_stop = False
 
     async def setup_stdin(self) -> None:
         """Setup async stdin reader."""
@@ -57,79 +50,34 @@ class Agent:
             sys.stdin
         )
 
-    async def read_message(self) -> ServerToAgentMessage | None:
+    async def read_message(self) -> dict | None:
         """Read one message from stdin."""
-        line = await self.reader.readline()
-        if not line:
-            return None
         try:
+            line = await self.reader.readline()
+            if not line:
+                return None
             return json.loads(line.decode().strip())
         except json.JSONDecodeError:
             return None
 
-    async def message_stream(self) -> AsyncGenerator[dict, None]:
-        """Yield messages from stdin to SDK."""
-        while not self.should_stop:
-            msg = await self.read_message()
-            if msg is None:
-                self.should_stop = True
-                return
-
-            if is_session_message(msg):
-                content = self.parse_content(msg)
-                yield {
-                    "type": "user",
-                    "message": {
-                        "role": "user",
-                        "content": content if isinstance(content, list) else [{"type": "text", "text": content}]
-                    }
-                }
-
-            elif is_session_interrupt(msg):
-                if self.client:
-                    await self.client.interrupt()
-                emit(SessionInterruptedEvent(
-                    type="session_interrupted",
-                    session_id=self.current_session_id or "unknown"
-                ))
-
-            elif is_process_stop(msg):
-                self.should_stop = True
-                return
-
-    def parse_content(self, msg: SessionMessageCommand) -> list[ContentBlock] | str:
-        """Parse message content."""
+    def parse_content(self, msg: dict) -> str:
+        """Parse message content to string."""
         if "text" in msg:
             return msg["text"]
         if "content" in msg:
-            return msg["content"]
+            content = msg["content"]
+            if isinstance(content, str):
+                return content
+            # Handle content blocks
+            if isinstance(content, list):
+                texts = []
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        texts.append(block.get("text", ""))
+                    elif isinstance(block, str):
+                        texts.append(block)
+                return "\n".join(texts)
         return ""
-
-    async def process_responses(self) -> None:
-        """Process responses from SDK."""
-        async for message in self.client.receive_response():
-            # Init message contains session_id
-            if isinstance(message, SystemMessage) and message.subtype == "init":
-                self.current_session_id = message.data.get("session_id")
-                emit(SessionStartedEvent(
-                    type="session_started",
-                    session_id=self.current_session_id or "unknown"
-                ))
-
-            # Result message means turn complete
-            elif isinstance(message, ResultMessage):
-                self.current_session_id = message.session_id
-                result = ResultData(
-                    duration_ms=message.duration_ms,
-                    duration_api_ms=message.duration_api_ms,
-                    total_cost_usd=message.total_cost_usd,
-                    num_turns=message.num_turns,
-                )
-                emit(SessionCompleteEvent(
-                    type="session_complete",
-                    session_id=self.current_session_id,
-                    result=result
-                ))
 
     async def run(self) -> None:
         """Main entry point."""
@@ -144,7 +92,7 @@ class Agent:
             emit(ProcessErrorEvent(type="process_error", message="Expected process_start"))
             return
 
-        # Create client
+        # Create client options
         resume_session_id = msg.get("session_id")
         fork = msg.get("fork", False)
 
@@ -157,28 +105,80 @@ class Agent:
             setting_sources=["user"],
         )
 
+        emit(ProcessReadyEvent(
+            type="process_ready",
+            workspace=self.workspace,
+            session_id=resume_session_id or "pending",
+            resumed=resume_session_id is not None,
+            forked=fork,
+        ))
+
+        # Wait for session_message
+        msg = await self.read_message()
+        if msg is None or not is_session_message(msg):
+            emit(ProcessErrorEvent(type="process_error", message="Expected session_message"))
+            return
+
+        # Parse prompt
+        prompt = self.parse_content(msg)
+
         try:
-            async with ClaudeSDKClient(options) as client:
-                self.client = client
-                self.current_session_id = resume_session_id
+            current_session_id = resume_session_id
+            got_result = False
 
-                emit(ProcessReadyEvent(
-                    type="process_ready",
-                    workspace=self.workspace,
-                    session_id=self.current_session_id or "pending",
-                    resumed=resume_session_id is not None,
-                    forked=fork,
+            # Use query() function - it handles connection lifecycle automatically
+            async for message in query(prompt=prompt, options=options):
+                # Init message contains session_id
+                if isinstance(message, SystemMessage) and message.subtype == "init":
+                    current_session_id = message.data.get("session_id")
+                    emit(SessionStartedEvent(
+                        type="session_started",
+                        session_id=current_session_id or "unknown"
+                    ))
+
+                # Result message means complete
+                elif isinstance(message, ResultMessage):
+                    got_result = True
+                    current_session_id = message.session_id
+                    result = ResultData(
+                        duration_ms=message.duration_ms,
+                        duration_api_ms=message.duration_api_ms,
+                        total_cost_usd=message.total_cost_usd,
+                        num_turns=message.num_turns,
+                    )
+                    emit(SessionCompleteEvent(
+                        type="session_complete",
+                        session_id=current_session_id,
+                        result=result
+                    ))
+                    # query() iterator will terminate after ResultMessage
+
+                # Process error (e.g., billing error, API error)
+                elif isinstance(message, ProcessError):
+                    emit(SessionErrorEvent(
+                        type="session_error",
+                        message=message.message
+                    ))
+                    return
+
+            # If query() ended without ResultMessage, emit completion anyway
+            if not got_result:
+                print(f"[AGENT] Warning: query() ended without ResultMessage", file=sys.stderr, flush=True)
+                emit(SessionCompleteEvent(
+                    type="session_complete",
+                    session_id=current_session_id or "unknown",
+                    result=ResultData(
+                        duration_ms=0,
+                        duration_api_ms=0,
+                        total_cost_usd=0,
+                        num_turns=0,
+                    )
                 ))
-
-                # Run query and response processing concurrently
-                await asyncio.gather(
-                    client.query(self.message_stream()),
-                    self.process_responses()
-                )
 
         except asyncio.CancelledError:
             pass
         except Exception as e:
+            print(f"[AGENT] Exception: {e}", file=sys.stderr, flush=True)
             emit(ProcessErrorEvent(type="process_error", message=str(e)))
 
         emit(ProcessStoppedEvent(type="process_stopped", reason="stop"))
