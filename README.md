@@ -1,265 +1,265 @@
-# Maru ([Case Study](https://www.ishaand.com/maru))
+# Maru
 
 <img width="2880" height="1620" alt="cover" src="https://github.com/user-attachments/assets/69dfd5f8-0532-4515-a59e-9d43f2243ad8" />
 
+A Claude Agent SDK example built with [Moru](https://moru.io) sandboxes. Build your own AI coding agent that runs in isolated cloud environments.
 
-An open-source background coding agent. Designed to understand, reason about, and contribute to existing codebases. Licensed for open-source use under MIT License
+## What is Maru?
 
-Sets up isolated execution environments for AI agents to work on GitHub repositories with tools to understand code, edit files, and much more.
+Maru demonstrates how to build a production-ready AI coding agent using the [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) and [Moru sandboxes](https://moru.io). It showcases patterns for running autonomous coding agents in isolated environments with full workspace persistence.
 
-### Agent Environment (The Maru Realm)
-- GitHub repository integration with branch management
-- Pull request generation with AI-authored commits
-- Real-time task status tracking and progress updates
-- Automatic workspace setup and cleanup on Micro-VMs
-- Kata QEMU containers for hardware-level isolation
+With this example, developers can build apps that:
+- Run Claude Code agents in isolated cloud sandboxes
+- Stream real-time agent messages to users
+- Resume sessions across sandbox restarts
+- Persist workspaces between sessions
+- Display native Claude Code message formats
 
-### Code Generation & Understanding
-- Multi-provider LLM support (Anthropic, OpenAI, OpenRouter)
-- Streaming chat interface with real-time responses
-- Tool execution with file operations, terminal commands, and code search
-- Memory system for repository-specific knowledge retention
-- Semantic code search, background processing
-- Lightweight Maru Wiki generation for comprehensive codebase documentation
-- Custom rules for Maru code generation
+## Features
 
-## Execution Modes
+### 🤖 Multi-Agent Sessions
+Run multiple Claude Agent SDK instances in parallel. Each agent gets its own dedicated Linux computer with a filesystem.
 
-Maru supports two execution modes through an abstraction layer:
+→ See [`apps/server/src/services/agent-session.ts`](apps/server/src/services/agent-session.ts)
 
-### Local Mode
-- Direct filesystem execution on the host machine
+### 🔄 Session Resume
+Agents maintain session history. Resume interrupted sessions seamlessly - the agent picks up exactly where it left off.
 
-### Remote Mode (For Deployment)
-- Hardware-isolated execution in Kata QEMU containers
-- True VM isolation via QEMU hypervisor
-- Kubernetes orchestration with bare metal nodes
+→ See [`apps/server/src/services/agent-session.ts`](apps/server/src/services/agent-session.ts) (`restoreSession`)
 
-Mode selection is controlled by `NODE_ENV` and `AGENT_MODE` environment variables.
+### ⚡ Real-time Streaming
+Stream agent messages as they happen. See tool executions, thinking, and results in real-time through WebSocket connections.
 
-## Development Setup
+→ See [`apps/server/src/socket.ts`](apps/server/src/socket.ts)
 
-### Repository Structure
+### 💬 Native Message Format
+Renders Claude Code's native message format using schemas from [moru-ai/agent-schemas](https://github.com/moru-ai/agent-schemas). Displays assistant messages, tool uses, thinking blocks, and system messages.
 
-- **Frontend** (`apps/frontend/`) - Next.js application with real-time chat interface, terminal emulator, file explorer, and task management
-- **Server** (`apps/server/`) - Node.js orchestrator handling LLM integration, WebSocket communication, task initialization, and API endpoints
-- **Sidecar** (`apps/sidecar/`) - Express.js service providing REST APIs for file operations within isolated containers
-- **Website** (`apps/website/`) - Marketing and landing page
-- **Database** (`packages/db/`) - Prisma schema and PostgreSQL client with comprehensive data models
-- **Types** (`packages/types/`) - Shared TypeScript type definitions for the entire platform
-- **Command Security** (`packages/command-security/`) - Security utilities for command validation and sanitization
-- **ESLint Config** (`packages/eslint-config/`) - Shared linting rules
-- **TypeScript Config** (`packages/typescript-config/`) - Shared TypeScript configurations
+→ See [`apps/frontend/components/claude-code/`](apps/frontend/components/claude-code/)
 
+### 💾 Workspace Persistence
+Workspaces are saved to cloud storage (GCS) and restored on session resume. Files, git history, and Claude session data persist across sessions.
+
+→ See [`apps/server/src/services/storage/`](apps/server/src/services/storage/)
+
+### 📁 File Explorer & Editor
+Browse and view files in the agent's workspace. Download files directly from the sandbox.
+
+→ See [`apps/frontend/components/agent-environment/`](apps/frontend/components/agent-environment/)
+
+## Upcoming
+
+- 🛑 **Session Interrupt**: Stop agent execution mid-task
+- 📋 **Input Queue**: Queue multiple messages while agent is working
+- ⏱️ **Long-running Agents**: Support for agents running hours or longer
+
+## Try It
+
+**Cloud**: [maru.moru.io](https://maru.moru.io)
+
+**Self-hosted**: Follow the setup instructions below.
+
+## Getting Started
 
 ### Prerequisites
-- Node.js 22
+
+- Node.js 22+
 - PostgreSQL
+- [Moru API Key](https://moru.io) (for sandbox execution)
+- GitHub OAuth App (for authentication)
 
 ### Installation
 
-1. Clone the repository and install dependencies:
+1. Clone and install dependencies:
+
 ```bash
-git clone <repository-url>
+git clone https://github.com/moru-ai/maru.git
 cd maru
 npm install
 ```
 
-2. Set up environment variables:
+2. Set up environment files:
+
 ```bash
-# Copy example environment files
-cp apps/server/.env.template apps/server/.env
-cp apps/frontend/.env.template apps/frontend/.env
+cp apps/server/.env.example apps/server/.env
+cp apps/frontend/.env.example apps/frontend/.env
 cp packages/db/.env.template packages/db/.env
 ```
 
-3. Configure the database:
-```bash
-# Create local PostgreSQL database
-psql -U postgres -c "CREATE DATABASE maru_dev;"
+3. Configure environment variables:
 
-# Update packages/db/.env with your database URL
-DATABASE_URL="postgres://postgres:@127.0.0.1:5432/maru_dev"
+**`packages/db/.env`**
+```bash
+DATABASE_URL="postgresql://postgres:@127.0.0.1:5432/maru_dev"
+DIRECT_URL="postgresql://postgres:@127.0.0.1:5432/maru_dev"
+```
+
+**`apps/server/.env`**
+```bash
+# Database
+DATABASE_URL="postgresql://postgres:@127.0.0.1:5432/maru_dev"
+
+# GitHub OAuth
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+
+# Moru Sandbox (required)
+MORU_API_KEY=your_moru_api_key
+MORU_TEMPLATE_ID=maru-agent
+MORU_SANDBOX_TIMEOUT_MS=3600000
+
+# GCS Storage (optional, for workspace persistence)
+GCS_BUCKET_NAME=your-bucket-name
+GCS_KEY_FILE=./gcs-key.json
+```
+
+**`apps/frontend/.env`**
+```bash
+NEXT_PUBLIC_SERVER_URL="http://localhost:4000"
+BETTER_AUTH_SECRET=your_secret_here
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+DATABASE_URL="postgresql://postgres:@127.0.0.1:5432/maru_dev"
+```
+
+4. Set up the database:
+
+```bash
+# Create database
+psql -U postgres -c "CREATE DATABASE maru_dev;"
 
 # Generate Prisma client and push schema
 npm run generate
 npm run db:push
 ```
 
-4. Start development servers:
+5. Build the agent template:
+
 ```bash
-# Start all services
+cd apps/agent
+cp .env.example .env
+# Add your MORU_API_KEY to .env
+
+# Build and register the template
+.venv/bin/python template.py
+```
+
+6. Start development servers:
+
+```bash
 npm run dev
-
-# Or start specific services
-npm run dev --filter=frontend
-npm run dev --filter=server
-npm run dev --filter=sidecar
 ```
 
-### Environment Configuration
+- Frontend: http://localhost:3000
+- Backend: http://localhost:4000
 
-Set variables in the following files:
-- Frontend: `apps/frontend/.env.local`
-- Server: `apps/server/.env`
-- Database: `packages/db/.env`
+## Architecture
 
-#### Quick start (local, no GitHub App install)
-Use a personal GitHub token so the GitHub selector works instantly without installing our app.
-
-1) Create a GitHub Personal Access Token with scopes: `repo`, `read:org`.
-2) Add env vars:
-
-An easy way to do this is run the `./setup-script.sh` which will take in your input variables and autoset them in the right places for you! If you would like to do it manually, follow the instructions below
-
-`apps/server/.env`
-```bash
-# Required
-DATABASE_URL="postgres://postgres:@127.0.0.1:5432/maru_dev"
-BETTER_AUTH_SECRET="dev-secret"
-
-GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxx
-
-# Local mode
-NODE_ENV=development
-AGENT_MODE=local
-
-# Optional: Pinecone for semantic search
-PINECONE_API_KEY="" # TODO: Set this to your Pinecone API key
-PINECONE_INDEX_NAME="maru"
-
-# Workspace directory for local agent:
-WORKSPACE_DIR= # TODO: Set this to your local workspace directory
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Frontend                              │
+│                     (Next.js 15)                            │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │ Chat UI     │  │ File        │  │ Claude Code         │ │
+│  │             │  │ Explorer    │  │ Message Renderer    │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ WebSocket
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        Backend                               │
+│                      (Node.js)                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │ Socket.IO   │  │ Agent       │  │ Storage             │ │
+│  │ Server      │  │ Session     │  │ (GCS)               │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ Moru SDK
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Moru Sandbox                             │
+│                  (Isolated Micro-VM)                        │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                   Agent (Python)                     │   │
+│  │  ┌─────────────┐  ┌────────────────────────────┐    │   │
+│  │  │ Claude      │  │ Claude Code CLI            │    │   │
+│  │  │ Agent SDK   │──│ (Tools: Read, Write, Bash) │    │   │
+│  │  └─────────────┘  └────────────────────────────┘    │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                        /workspace                            │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-`apps/frontend/.env.local`
-```bash
-# Point frontend to your server if needed
-NEXT_PUBLIC_SERVER_URL=http://localhost:4000
+### Key Components
 
-# Marks environment; any value other than "production" enables local behavior
-NEXT_PUBLIC_VERCEL_ENV=development
+| Component | Description |
+|-----------|-------------|
+| `apps/frontend` | Next.js 15 app with real-time chat, file explorer, Claude Code message renderer |
+| `apps/server` | Node.js backend handling WebSocket communication, agent sessions, workspace storage |
+| `apps/agent` | Python agent running inside Moru sandbox, using Claude Agent SDK |
+| `packages/db` | Prisma schema for tasks, sessions, and events |
+| `packages/types` | Shared TypeScript types |
 
-GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxx
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
+### How It Works
 
-# Optional (only if you want OAuth login locally)
-BETTER_AUTH_SECRET=dev-secret
-```
-
-`packages/db/.env`
-```bash
-DATABASE_URL="postgres://postgres:@127.0.0.1:5432/maru_dev"
-DIRECT_URL="postgres://postgres:@127.0.0.1:5432/maru_dev"
-```
-
-With `GITHUB_PERSONAL_ACCESS_TOKEN` set on the server and `NEXT_PUBLIC_VERCEL_ENV` not equal to `production`, the backend uses your PAT for repo/branch/issue queries. The frontend's GitHub selector works immediately.
+1. User sends a message through the frontend
+2. Backend creates a Moru sandbox from the `maru-agent` template
+3. If resuming, workspace and session history are restored to the sandbox
+4. Agent receives the message via stdin and calls Claude Agent SDK's `query()` function
+5. Backend polls the session JSONL file for new entries and streams them to frontend
+6. On completion, workspace is saved to GCS for future sessions
 
 ## Development Commands
 
-### Linting and Formatting
-
 ```bash
-# Lint all packages and apps
-npm run lint
-
-# Format code with Prettier
-npm run format
+# Start dev servers (frontend + backend)
+npm run dev
 
 # Type checking
 npm run check-types
+
+# Linting
+npm run lint
+
+# Database operations
+npm run db:push        # Push schema changes
+npm run generate       # Generate Prisma client
+npm run db:studio      # Open Prisma Studio
 ```
 
-### Database Operations
+### Rebuilding the Agent Template
+
+After modifying any files in `apps/agent/` (including `Dockerfile`, `src/`, or `INSTRUCTIONS.md`), you must rebuild the template:
 
 ```bash
-# Generate Prisma client from schema
-npm run generate
-
-# Push schema changes to database (for development)
-npm run db:push
-
-# Reset database and push schema (destructive)
-npm run db:push:reset
-
-# Open Prisma Studio GUI
-npm run db:studio
-
-# Run migrations in development
-npm run db:migrate:dev
+cd apps/agent
+.venv/bin/python template.py
 ```
 
-### Building and Deployment
+This builds a new Docker image and registers it with Moru. The next sandbox will use the updated template.
 
-```bash
-# Build all packages and apps
-npm run build
+## Project Structure
 
-# Build specific app
-npm run build --filter=frontend
-npm run build --filter=server
-npm run build --filter=sidecar
+```
+maru/
+├── apps/
+│   ├── agent/         # Python agent for Moru sandbox
+│   │   ├── src/       # Agent source code
+│   │   ├── Dockerfile # Sandbox container definition
+│   │   └── template.py # Template build script
+│   ├── frontend/      # Next.js 15 frontend
+│   └── server/        # Node.js backend
+└── packages/
+    ├── db/            # Prisma schema
+    └── types/         # Shared TypeScript types
 ```
 
-## Tool System
+## Acknowledgements
 
-Maru provides a comprehensive set of tools for AI agents:
+This repository is a fork of [shadow](https://github.com/ishaan1013/shadow) by [Ishaan Dey](https://ishaand.com), [Rajan Agarwal](https://www.rajan.sh/), and [Elijah Kurien](https://www.elijahkurien.com/).
 
-### File Operations
-- `read_file` - Read file contents with line range support
-- `edit_file` - Write and modify files
-- `search_replace` - Precise string replacement
-- `delete_file` - Safe file deletion
-- `list_dir` - Directory exploration
+## License
 
-### Code Search
-- `grep_search` - Pattern matching with regex
-- `file_search` - Fuzzy filename search
-- `semantic_search` - AI-powered semantic code search
-
-### Terminal & Execution
-- `run_terminal_cmd` - Command execution with real-time output
-- Command validation and security checks
-
-### Task Management
-- `todo_write` - Structured task management
-
-## Development Guidelines
-
-### Code Organization
-- TypeScript throughout with strict type checking
-- Shared configurations via packages
-- Clean separation between execution modes
-- WebSocket event compatibility across frontend/backend
-
-### Security
-- Command validation in all execution modes
-- Path traversal protection
-- Workspace boundary enforcement
-- Container isolation in remote mode
-
-### Important Notes
-- Always test both local and remote modes for production features
-- Keep initialization steps mode-aware and properly abstracted
-- Maintain WebSocket event compatibility across frontend/backend changes
-- **Remote mode requires Amazon Linux 2023 nodes** for Kata Containers compatibility
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes with proper TypeScript types
-4. Test in both local and remote modes
-5. Submit a pull request
-   
-We're excited to see what you've built with Maru!
-
-
----
-
-[Ishaan Dey](https://ishaand.com) — [X](https://x.com/ishaandey_)
-
-[Rajan Agarwal](https://www.rajan.sh/) — [X](https://x.com/_rajanagarwal)
-
-[Elijah Kurien](https://www.elijahkurien.com/) — [X](https://x.com/ElijahKurien)
+MIT License
