@@ -172,9 +172,25 @@ export class GCSSandboxStorage implements SandboxStorage {
       const tempTarPath = `/tmp/${archiveId}.tar.gz`;
       await sandbox.files.write(tempTarPath, content.buffer as ArrayBuffer);
 
+      // Ensure target directories exist before extraction
+      // The tar archive contains paths relative to / (e.g., "workspace/file.txt")
+      // We need to create these root-level directories if they don't exist
+      // Try regular mkdir first, then fall back to sudo if needed
+      for (const path of manifest.paths) {
+        const dirPath = path.startsWith("/") ? path : `/${path}`;
+        const mkdirResult = await sandbox.commands.run(`mkdir -p ${dirPath}`);
+        if (mkdirResult.exitCode !== 0) {
+          // Try with sudo if regular mkdir fails
+          await sandbox.commands.run(`sudo mkdir -p ${dirPath} && sudo chmod 777 ${dirPath}`);
+        }
+      }
+
       // Extract to root (tar was created with paths relative to /)
+      // Use --no-same-owner and --no-same-permissions to avoid permission errors
+      // when extracting as non-root user to directories owned by root
+      // Use --no-overwrite-dir to skip modifying attributes of existing directories
       const extractResult = await sandbox.commands.run(
-        `tar -xzf ${tempTarPath} -C /`,
+        `tar --no-same-owner --no-same-permissions --no-overwrite-dir -xzf ${tempTarPath} -C /`,
         { timeoutMs: 60000 }
       );
 

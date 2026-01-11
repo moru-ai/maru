@@ -34,7 +34,9 @@ export async function sendMessage(
   });
 
   // Create sandbox
-  const sandbox = await Sandbox.create(config.moruTemplateId || "base", {
+  const templateId = config.moruTemplateId || "base";
+  console.log(`[AGENT_SESSION] Creating sandbox with template: ${templateId}`);
+  const sandbox = await Sandbox.create(templateId, {
     apiKey: config.moruApiKey,
     timeoutMs: config.moruSandboxTimeoutMs || 3600000,
     metadata: { taskId, userId }
@@ -95,6 +97,16 @@ export async function sendMessage(
         } catch (err) {
           console.error(`[AGENT_SESSION] Failed to parse agent output:`, err);
         }
+      }
+    },
+    onStderr: (data: string) => {
+      console.error(`[AGENT_SESSION] Agent stderr: ${data}`);
+      // Check for common startup errors
+      if (data.includes("No such file or directory") || data.includes("not found")) {
+        handleMessage({
+          type: "session_error",
+          message: `Agent failed to start: ${data.trim()}. The claude-agent template may need to be rebuilt.`
+        });
       }
     },
   });

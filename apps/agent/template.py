@@ -26,7 +26,7 @@ AGENT_DIR = Path(__file__).parent
 
 
 def build_template():
-    template_alias = "claude-agent"
+    template_alias = "maru-agent"
 
     print("=" * 50)
     print("Building Claude Agent Template")

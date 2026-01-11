@@ -64,7 +64,7 @@ export const sharedConfigSchema = z.object({
 
   // Moru Sandbox configuration
   MORU_API_KEY: z.string().optional(),
-  MORU_TEMPLATE_ID: z.string().default("claude-agent"),
+  MORU_TEMPLATE_ID: z.string().default("maru-agent"),
   MORU_SANDBOX_TIMEOUT_MS: z.coerce.number().default(3600000), // 1 hour
 
   // GCS Storage configuration
