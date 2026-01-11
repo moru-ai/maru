@@ -12,6 +12,7 @@ interface CCToolUseBlockProps {
 }
 
 const MAX_COLLAPSED_LINES = 4;
+const WEB_SEARCH_MAX_COLLAPSED_LINES = 1;
 
 /**
  * Convert kebab-case to Title Case
@@ -274,10 +275,15 @@ export function CCToolUseBlock({
     typeof result?.content === "string" ? result.content : "";
   const resultLines = resultContent.split("\n");
   const totalLines = resultLines.length;
+
+  // Use fewer collapsed lines for WebSearch to keep results compact
+  const isWebSearch = block.name === "WebSearch";
+  const maxCollapsedLines = isWebSearch ? WEB_SEARCH_MAX_COLLAPSED_LINES : MAX_COLLAPSED_LINES;
+
   const displayLines = isExpanded
     ? resultLines
-    : resultLines.slice(0, MAX_COLLAPSED_LINES);
-  const hiddenLines = isExpanded ? 0 : totalLines - MAX_COLLAPSED_LINES;
+    : resultLines.slice(0, maxCollapsedLines);
+  const hiddenLines = isExpanded ? 0 : totalLines - maxCollapsedLines;
   const resultSummary = result ? formatResultSummary(block.name, result) : "";
 
   return (
@@ -299,7 +305,7 @@ export function CCToolUseBlock({
           className={cn(
             "mt-0.5 shrink-0 leading-none",
             isLoading || !result
-              ? "text-yellow-500"
+              ? "text-yellow-500 animate-pulse"
               : hasError
                 ? "text-red-500"
                 : "text-green-500"
