@@ -1,13 +1,15 @@
 # Maru
 
-A Claude Agent SDK example built with [Moru](https://moru.io) sandboxes. Build your own AI coding agent that runs in isolated cloud environments.
+A Claude Agent SDK example built with [Moru](https://moru.io/docs) sandboxes. Build your own AI agent that runs in isolated cloud environments.
+
+https://github.com/user-attachments/assets/7e99b82d-9f9f-4664-97f8-eedd833ed5f4
 
 ## What is Maru?
 
-Maru demonstrates how to build a production-ready AI coding agent using the [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) and [Moru sandboxes](https://moru.io). It showcases patterns for running autonomous coding agents in isolated environments with full workspace persistence.
+Maru demonstrates how to build a web-based AI agent using the [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) and [Moru sandboxes](https://moru.io/dpcs). It showcases patterns for running autonomous agents in isolated environments with full workspace persistence.
 
-With this example, developers can build apps that:
-- Run Claude Code agents in isolated cloud sandboxes
+With this example, you can build apps that:
+- Run Claude agents in isolated cloud sandboxes
 - Stream real-time agent messages to users
 - Resume sessions across sandbox restarts
 - Persist workspaces between sessions
