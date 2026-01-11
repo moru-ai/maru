@@ -256,7 +256,7 @@ export function CCMessages({ entries }: CCMessagesProps) {
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {displayEntries.map((entry) => {
         // System message
         if ("type" in entry && entry.type === "system") {
