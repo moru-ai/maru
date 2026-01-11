@@ -14,7 +14,7 @@ import {
   Loader2,
   Square,
 } from "lucide-react";
-import { redirect, useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   useEffect,
   useRef,
@@ -53,6 +53,7 @@ export function PromptForm({
   };
 }) {
   const { taskId } = useParams<{ taskId: string }>();
+  const router = useRouter();
   const { isPending, startTransition } = transition || {};
 
   const [message, setMessage] = useState("");
@@ -122,11 +123,13 @@ export function PromptForm({
         }
         if (taskId) {
           queryClient.invalidateQueries({ queryKey: ["tasks"] });
-          redirect(`/tasks/${taskId}`);
+          // Prefetch the task page while still showing loading state
+          await router.prefetch(`/tasks/${taskId}`);
+          router.push(`/tasks/${taskId}`);
         }
       });
     },
-    [message, selectedModel, queryClient, isPending, startTransition]
+    [message, selectedModel, queryClient, isPending, startTransition, router]
   );
 
   // Direct send action (no modal)
