@@ -81,7 +81,7 @@ export async function sendMessage(
   const handle = await sandbox.commands.run("cd /app/src && python3 agent.py", {
     background: true,
     stdin: true,
-    envs: { WORKSPACE_DIR: "/workspace" },
+    envs: { ANTHROPIC_API_KEY: apiKey, WORKSPACE_DIR: "/workspace" },
     // Agent sessions can run for extended periods (web searches, complex tasks).
     // Default SDK timeout is 60 seconds which causes silent failures on longer tasks.
     timeoutMs: MAX_SESSION_TIMEOUT_MS,

@@ -305,7 +305,7 @@ export function CCToolUseBlock({
           className={cn(
             "mt-0.5 shrink-0 leading-none",
             isLoading || !result
-              ? "text-yellow-500 animate-pulse"
+              ? "text-[#1e3a5f] animate-blink"
               : hasError
                 ? "text-red-500"
                 : "text-green-500"

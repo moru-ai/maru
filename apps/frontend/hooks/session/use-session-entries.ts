@@ -268,6 +268,17 @@ export function useSessionEntries(
       }
     }
 
+    function onSessionError(data: { taskId: string; error?: string }) {
+      if (data.taskId === taskId) {
+        sessionCompletedRef.current = true;
+        setIsStreaming(false);
+        // Refetch to ensure we have all entries including the error
+        queryClient.invalidateQueries({
+          queryKey: ['session-entries', taskId],
+        });
+      }
+    }
+
     function onAgentStopped(data: { taskId: string }) {
       if (data.taskId === taskId) {
         setIsStreaming(false);
@@ -278,6 +289,7 @@ export function useSessionEntries(
     socket.on('session-entries', onSessionEntries);
     socket.on('stream-complete', onStreamComplete);
     socket.on('session-complete', onSessionComplete);
+    socket.on('session-error', onSessionError);
     socket.on('agent-stopped', onAgentStopped);
 
     return () => {
@@ -285,6 +297,7 @@ export function useSessionEntries(
       socket.off('session-entries', onSessionEntries);
       socket.off('stream-complete', onStreamComplete);
       socket.off('session-complete', onSessionComplete);
+      socket.off('session-error', onSessionError);
       socket.off('agent-stopped', onAgentStopped);
     };
   }, [socket, taskId, isConnected, enabled, addEntry, addEntries, queryClient]);

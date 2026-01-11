@@ -3,8 +3,10 @@ import { ExternalLink, Globe } from "lucide-react";
 import { ToolTypes } from "@repo/types";
 import { ToolComponent } from "./tool";
 import { getToolResult } from "@repo/types";
+import { useState } from "react";
 
 export function WebSearchTool({ message }: { message: Message }) {
+  const [expanded, setExpanded] = useState(false);
   const toolMeta = message.metadata?.tool;
   if (!toolMeta) return null;
 
@@ -32,7 +34,7 @@ export function WebSearchTool({ message }: { message: Message }) {
             {result.results.length} results
           </div>
           <div className="space-y-3">
-            {result.results.slice(0, 3).map((item, index) => (
+            {result.results.slice(0, expanded ? 3 : 1).map((item, index) => (
               <div
                 key={index}
                 className="border-border bg-card rounded-md border p-3"
@@ -59,6 +61,22 @@ export function WebSearchTool({ message }: { message: Message }) {
                 </div>
               </div>
             ))}
+            {!expanded && result.results.length > 1 && (
+              <button
+                onClick={() => setExpanded(true)}
+                className="text-muted-foreground hover:text-foreground text-xs transition-colors"
+              >
+                +{Math.min(result.results.length - 1, 2)} more (click to expand)
+              </button>
+            )}
+            {expanded && result.results.length > 1 && (
+              <button
+                onClick={() => setExpanded(false)}
+                className="text-muted-foreground hover:text-foreground text-xs transition-colors"
+              >
+                Show less
+              </button>
+            )}
           </div>
         </div>
       ) : result && status === "COMPLETED" ? (

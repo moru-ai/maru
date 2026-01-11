@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { AlertCircle } from "lucide-react";
 import type {
   AssistantMessage,
   ContentBlock,
@@ -105,6 +106,37 @@ export function CCAssistantMessage({
     () => groupContentBlocks(content, resultsMap),
     [content, resultsMap]
   );
+
+  // Handle API error messages (e.g., billing_error)
+  if (message.isApiErrorMessage) {
+    const errorContent = content
+      .filter(isTextBlock)
+      .map((b) => b.text)
+      .join("\n");
+
+    const errorTitle = message.error === "billing_error"
+      ? "Billing Error"
+      : "API Error";
+
+    return (
+      <div
+        className={cn(
+          "flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive",
+          className
+        )}
+      >
+        <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+        <div className="flex-1">
+          <div className="font-medium">{errorTitle}</div>
+          {errorContent && (
+            <div className="mt-1 text-xs opacity-90 whitespace-pre-wrap">
+              {errorContent}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (groups.length === 0) {
     return null;
