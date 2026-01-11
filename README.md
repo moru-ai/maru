@@ -1,7 +1,5 @@
 # Maru
 
-<img width="2880" height="1620" alt="cover" src="https://github.com/user-attachments/assets/69dfd5f8-0532-4515-a59e-9d43f2243ad8" />
-
 A Claude Agent SDK example built with [Moru](https://moru.io) sandboxes. Build your own AI coding agent that runs in isolated cloud environments.
 
 ## What is Maru?
