@@ -1,6 +1,6 @@
 # Maru
 
-A Claude Agent SDK example built with [Moru](https://moru.io/docs) sandboxes. Build your own AI agent that runs in isolated cloud environments.
+A Claude Agent SDK example built with [Moru](https://moru.io/docs) sandboxes. Build your own AI agent that runs in isolated cloud VMs
 
 https://github.com/user-attachments/assets/7e99b82d-9f9f-4664-97f8-eedd833ed5f4
 
