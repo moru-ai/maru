@@ -45,17 +45,25 @@ export default function AuthPage() {
 
         <div className="animate-in fade-in fill-mode-both ease-out-quad delay-2000 mt-6 flex flex-col gap-2 duration-500">
           <div className="text-muted-foreground text-center text-sm">
-            Maru is an{" "}
+            Maru is an AI agent built with{" "}
             <a
-              href="https://github.com/moru-ai/maru"
+              href="https://platform.claude.com/docs/en/agent-sdk/overview"
               target="_blank"
               className="text-foreground inline-block cursor-pointer font-medium hover:underline hover:opacity-90"
               rel="noreferrer"
             >
-              open-source
-            </a>{" "}
-            background coding agent. Designed to understand, reason about, and
-            contribute to existing codebases.
+              Claude Agent SDK
+            </a>
+            . Designed to demonstrate how to use Claude with{" "}
+            <a
+              href="https://moru.io/docs"
+              target="_blank"
+              className="text-foreground inline-block cursor-pointer font-medium hover:underline hover:opacity-90"
+              rel="noreferrer"
+            >
+              Moru sandbox
+            </a>
+            .
           </div>
         </div>
       </div>
