@@ -1,6 +1,6 @@
 # Maru
 
-A web clone of Claude Code built with [Moru](https://github.com/moru-ai/moru) sandboxes and [Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/overview).
+A research assistant built with [Moru](https://github.com/moru-ai/moru) sandboxes and [Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/overview).
 
 https://github.com/user-attachments/assets/7e99b82d-9f9f-4664-97f8-eedd833ed5f4
 
@@ -24,14 +24,13 @@ Workspaces are saved to storage and restored on session resume. Files and Claude
 ### 📁 File Explorer & Editor
 Browse and view files in the agent's workspace. Download files that the agent writes or edits.
 
-## How did you cloned CC
+## How It Works
 
-- Claude Code stores each chat session locally as newline-delimited JSON.
-- I reverse-engineered those JSONL message formats and turned them into JSON Schemas for reuse (see [agent-schemas](https://github.com/moru-ai/agent-schemas))
-- When a user sends a message, we boot a fresh [Moru](https://github.com/moru-ai/moru) VM with a clean workspace; if it’s a resume, we restore the previous workspace and session JSONL into the VM
-- Inside the VM, the agent reads the message from stdin and calls the Claude Agent SDK `query()` function.
-- The backend tails the session JSONL file for new records and streams them to the frontend in near real time.
-- When the run completes, we sync the workspace to Google Cloud Storage (GCS) so it can be restored next time.
+- Each agent runs in an isolated [Moru](https://github.com/moru-ai/moru) sandbox VM with its own workspace
+- Messages are processed using the [Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/overview) `query()` function
+- Session state is stored as newline-delimited JSON, following the schema defined in [agent-schemas](https://github.com/moru-ai/agent-schemas)
+- The backend streams JSONL records to the frontend in real-time
+- Workspaces are synced to Google Cloud Storage (GCS) for persistence across sessions
 
 ## Try It
 
