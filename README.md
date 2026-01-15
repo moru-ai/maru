@@ -1,6 +1,6 @@
 # Maru
 
-A web clone of Claude Code built with [Moru](https://github.com/moru-ai/moru) sandboxes and [Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/overview).
+A research assistant built with [Moru](https://github.com/moru-ai/moru) sandbox and [Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/overview).
 
 https://github.com/user-attachments/assets/7e99b82d-9f9f-4664-97f8-eedd833ed5f4
 
@@ -24,7 +24,7 @@ Workspaces are saved to storage and restored on session resume. Files and Claude
 ### 📁 File Explorer & Editor
 Browse and view files in the agent's workspace. Download files that the agent writes or edits.
 
-## How did you cloned CC
+## Detail
 
 - Claude Code stores each chat session locally as newline-delimited JSON.
 - I reverse-engineered those JSONL message formats and turned them into JSON Schemas for reuse (see [agent-schemas](https://github.com/moru-ai/agent-schemas))
