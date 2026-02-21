@@ -1,6 +1,4 @@
-# Maru
-
-A research assistant built with [Moru](https://github.com/moru-ai/moru) sandbox and [Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/overview).
+hello world
 
 https://github.com/user-attachments/assets/7e99b82d-9f9f-4664-97f8-eedd833ed5f4
 
